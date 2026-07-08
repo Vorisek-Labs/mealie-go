@@ -1,0 +1,194 @@
+export interface UserProfile {
+  id: string;
+  username: string;
+  fullName?: string;
+  email?: string;
+  group: string;
+  household: string;
+  admin: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  page: number;
+  per_page: number;
+  total: number;
+  total_pages: number;
+  items: T[];
+}
+
+export interface RecipeTag {
+  id?: string;
+  name: string;
+  slug: string;
+}
+
+export interface RecipeCategory {
+  id?: string;
+  name: string;
+  slug: string;
+}
+
+export interface RecipeUnit {
+  id?: string;
+  name: string;
+  abbreviation?: string;
+}
+
+export interface RecipeFood {
+  id?: string;
+  name: string;
+}
+
+export interface RecipeSummary {
+  id: string;
+  userId: string;
+  groupId: string;
+  name: string;
+  slug: string;
+  image?: string;
+  description?: string;
+  recipeYield?: string;
+  totalTime?: string;
+  prepTime?: string;
+  cookTime?: string;
+  rating?: number;
+  dateAdded?: string;
+  lastMade?: string;
+  tags: RecipeTag[];
+  recipeCategory: RecipeCategory[];
+}
+
+export interface RecipeIngredient {
+  title?: string;
+  note?: string;
+  unit?: RecipeUnit;
+  food?: RecipeFood;
+  disableAmount: boolean;
+  quantity?: number;
+  originalText?: string;
+  referenceId?: string;
+  display?: string;
+}
+
+export interface RecipeInstruction {
+  id?: string;
+  title?: string;
+  text: string;
+}
+
+export interface RecipeNote {
+  title: string;
+  text: string;
+}
+
+export interface RecipeNutrition {
+  calories?: string;
+  fatContent?: string;
+  proteinContent?: string;
+  carbohydrateContent?: string;
+  fiberContent?: string;
+  sodiumContent?: string;
+  sugarContent?: string;
+}
+
+export interface RecipeSettings {
+  public: boolean;
+  showNutrition: boolean;
+  disableComments: boolean;
+  disableAmount: boolean;
+  locked: boolean;
+}
+
+export interface RecipeAsset {
+  name: string;
+  icon: string;
+  fileName: string;
+}
+
+export interface RecipeComment {
+  id: string;
+  recipeId: string;
+  userId: string;
+  text: string;
+  createdAt: string;
+  updatedAt?: string;
+  user?: { id: string; fullName?: string; username: string };
+}
+
+export interface ShoppingLabel {
+  id: string;
+  groupId: string;
+  householdId: string;
+  name: string;
+  color?: string;
+}
+
+export interface Recipe extends RecipeSummary {
+  recipeIngredient: RecipeIngredient[];
+  recipeInstructions: RecipeInstruction[];
+  notes: RecipeNote[];
+  assets: RecipeAsset[];
+  nutrition?: RecipeNutrition;
+  settings?: RecipeSettings;
+}
+
+export type MealPlanEntryType = 'breakfast' | 'lunch' | 'dinner' | 'side';
+
+export interface MealPlanEntry {
+  id: number;
+  groupId: string;
+  householdId: string;
+  userId: string;
+  date: string;
+  entryType: MealPlanEntryType;
+  title?: string;
+  text?: string;
+  recipeId?: string;
+  recipe?: RecipeSummary;
+}
+
+export interface CreateMealPlanEntry {
+  date: string;
+  entryType: MealPlanEntryType;
+  title?: string;
+  recipeId?: string;
+}
+
+export interface ShoppingList {
+  id: string;
+  groupId: string;
+  householdId: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ShoppingListWithItems extends ShoppingList {
+  listItems: ShoppingListItem[];
+}
+
+export interface ShoppingListItem {
+  id: string;
+  shoppingListId: string;
+  checked: boolean;
+  position: number;
+  note?: string;
+  isFood: boolean;
+  unit?: RecipeUnit;
+  food?: RecipeFood;
+  quantity?: number;
+  display?: string;
+  labelId?: string;
+  label?: { id: string; name: string; color?: string };
+}
+
+export interface Cookbook {
+  id: string;
+  groupId: string;
+  householdId: string;
+  name: string;
+  description?: string;
+  slug: string;
+  position: number;
+  public: boolean;
+}
