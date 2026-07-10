@@ -72,6 +72,23 @@ You'll need a running Mealie server to connect to — see the
 (with gotchas Mealie's own docs don't cover), architectural decisions, and known issues. Worth a
 read whether you're using an AI coding assistant or not.
 
+## Security Notes
+
+- **Cleartext (`http://`) traffic is allowed app-wide.** This isn't scoped to a specific host via
+  an Android Network Security Config — it's a blanket allowance, needed because plenty of
+  self-hosted Mealie instances run over plain HTTP on a home LAN with no reverse proxy in front.
+  If your server is reachable at `http://`, your login credentials and JWT cross the network
+  unencrypted, same as any other plaintext-HTTP traffic. If your Mealie server is reachable from
+  outside your LAN, put it behind HTTPS (a reverse proxy like Caddy or Traefik with a real cert,
+  or a Let's Encrypt setup) or access it over a VPN/Tailscale instead of exposing plain HTTP to the
+  internet.
+- Saved login credentials (used for the multi-account quick-switch on the login screen) are stored
+  in `expo-secure-store` (Android Keystore-encrypted, excluded from Android app-data backups), not
+  in plain AsyncStorage.
+- Found a security issue? Please open an issue (or a private security advisory, if you'd rather
+  not disclose it publicly first) — this is a hobby project without a dedicated security contact,
+  but reports are welcome and will be taken seriously.
+
 ## Open Source
 
 Mealie Go is free and open source under the [MIT License](LICENSE). Fork it, modify it, self-host

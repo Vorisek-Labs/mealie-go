@@ -307,6 +307,33 @@ export is generated on-device with `expo-print` + shared via `expo-sharing`.
 
 ---
 
+## Security
+
+Full audit done 2026-07-09 (see Build Status part 8). Summary of what to keep in mind going forward:
+
+- **Saved account passwords** (`SavedAccount[]` in `mealieApi.ts`, the login screen's multi-account
+  quick-switch) live in `expo-secure-store`, not AsyncStorage — this was a real plaintext-password
+  bug, fixed. If you ever add a new field to `SavedAccount` or a similar "remember this for
+  autofill" feature anywhere else, it needs to go through SecureStore too, not AsyncStorage.
+  AsyncStorage is fine for non-secret prefs (server URL, unit system, welcome-seen flag) — it's
+  specifically credentials/tokens that need the encrypted store.
+- **`android.blockedPermissions`** in `app.json` strips `RECORD_AUDIO` and `SYSTEM_ALERT_WINDOW`,
+  which Expo's default prebuild template includes but this app never uses. `READ_EXTERNAL_STORAGE`/
+  `WRITE_EXTERNAL_STORAGE` are still present and legitimately needed by `expo-image-picker`
+  (camera roll picking) — don't block those without confirming photo picking still works on
+  older (pre-scoped-storage) Android versions first.
+- **`usesCleartextTraffic: true`** (via `expo-build-properties`) is intentionally broad, not
+  scoped to a specific host — this app needs to support arbitrary self-hosted servers, many of
+  which run on plain `http://` over a home LAN. This is a known, accepted, and README-documented
+  tradeoff, not an oversight — don't "fix" it by adding a Network Security Config without
+  discussing with the user first, since it could break connectivity to legitimate HTTP-only
+  servers.
+- If you add any new HTML-building code (like the PDF export's `buildRecipePdfHtml`), run
+  user/server-controlled text through `escapeHtml()` before interpolating — the existing PDF
+  builder does this correctly for every field; match that pattern.
+
+---
+
 ## Build Commands
 
 ```powershell
@@ -395,6 +422,34 @@ At the end of every session, commit all changes AND update the Current Build Sta
 ## Current Build Status
 
 **Session (latest) — 2026-07-09**
+
+### Session 2026-07-09 (part 8) — full security audit + fixes, ahead of going public
+User asked for a full security audit ahead of/after making the repo public, since self-hosters
+(the app's whole audience) are exactly the people who'll pick apart a public repo's security.
+- **FIXED (high severity)**: `SavedAccount[]` (login screen's multi-account quick-switch, which
+  stores passwords for autofill) was persisted in plaintext via AsyncStorage — unencrypted at
+  rest, AND included in Android's default app-data backup (the `expo-secure-store` backup-exclusion
+  rules only protect *its own* prefs file, not AsyncStorage). Moved to `expo-secure-store`, with a
+  one-time migration in `getSavedAccounts()` that reads any legacy plaintext copy, re-saves it
+  encrypted, and deletes the plaintext original. See the new Security section above.
+- **FIXED (low severity)**: removed `RECORD_AUDIO` and `SYSTEM_ALERT_WINDOW` from the Android
+  manifest via `android.blockedPermissions` in `app.json` — these were part of Expo's default
+  prebuild template, not used by anything in this app. Confirmed via the actual merged manifest
+  (`android/app/build/intermediates/merged_manifests/release/.../AndroidManifest.xml`) that both
+  are gone from the final build. Deliberately did NOT remove `READ/WRITE_EXTERNAL_STORAGE` — those
+  ARE used, by `expo-image-picker`'s camera-roll picker, confirmed by reading its manifest.
+- **Documented (medium severity, not fixed — accepted tradeoff)**: `usesCleartextTraffic: true` is
+  app-wide, not host-scoped. Necessary for self-hosted `http://` servers on a home LAN; added a
+  Security Notes section to the README explaining the risk and recommending HTTPS/VPN for anyone
+  exposing their server beyond their LAN.
+- Audited and found clean: PDF export's HTML builder escapes all interpolated text fields; no
+  `eval`/`WebView`/`dangerouslySetInnerHTML` anywhere; no hardcoded secrets; `npm audit`'s 16
+  moderate advisories are all in the Expo/Metro CLI build toolchain, not the shipped app bundle.
+- Built + installed on device, confirmed clean launch via logcat, confirmed the two blocked
+  permissions are actually absent from the final merged manifest. `npx tsc --noEmit` clean.
+- NEEDS DEVICE TESTING: sign out and back in to exercise the SecureStore migration path end-to-end
+  (confirm the saved-account dropdown still offers your account and autofills the password
+  correctly) — this wasn't something drivable via adb alone, needs an actual hands-on pass.
 
 ### Session 2026-07-09 (part 5) — onboarding: Welcome screen + in-app Guide
 - **Welcome screen** — shown once, the first time the app has a logged-in user after install

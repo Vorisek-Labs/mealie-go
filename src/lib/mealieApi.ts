@@ -19,9 +19,21 @@ export interface SavedAccount {
   password: string;
 }
 
+// Saved accounts include plaintext passwords (so the login form can
+// autofill them), so this list lives in expo-secure-store (Android
+// Keystore-encrypted, and excluded from Android's app-data backups) —
+// NOT AsyncStorage, which is neither encrypted nor backup-excluded.
 export async function getSavedAccounts(): Promise<SavedAccount[]> {
-  const raw = await AsyncStorage.getItem(SAVED_ACCOUNTS_KEY);
-  return raw ? (JSON.parse(raw) as SavedAccount[]) : [];
+  const raw = await SecureStore.getItemAsync(SAVED_ACCOUNTS_KEY);
+  if (raw) return JSON.parse(raw) as SavedAccount[];
+
+  // One-time migration for installs that saved this list before the fix
+  // above: move it out of plaintext AsyncStorage and wipe the old copy.
+  const legacy = await AsyncStorage.getItem(SAVED_ACCOUNTS_KEY);
+  if (!legacy) return [];
+  await SecureStore.setItemAsync(SAVED_ACCOUNTS_KEY, legacy);
+  await AsyncStorage.removeItem(SAVED_ACCOUNTS_KEY);
+  return JSON.parse(legacy) as SavedAccount[];
 }
 
 export async function saveAccount(account: SavedAccount): Promise<void> {
@@ -30,7 +42,7 @@ export async function saveAccount(account: SavedAccount): Promise<void> {
     a => !(a.serverUrl === account.serverUrl && a.username === account.username)
   );
   filtered.unshift(account);
-  await AsyncStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(filtered));
+  await SecureStore.setItemAsync(SAVED_ACCOUNTS_KEY, JSON.stringify(filtered));
 }
 
 export async function getServerUrl(): Promise<string> {
