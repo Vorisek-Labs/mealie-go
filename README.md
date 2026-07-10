@@ -22,6 +22,11 @@ Website: [mealiego.voriseklabs.com](https://mealiego.voriseklabs.com)
 - Random recipe picker, across your whole collection or inside a single cookbook
 - "What can I make?" - pick the ingredients and tools you have on hand and get recipe
   suggestions, with anything you're still missing called out
+- Filter by prep time or cook time separately (15 min or less, 30 min or less, 1 hour or less,
+  2 hours or less), alongside the existing category/tag/tool/food filters
+- Cook Mode: a full-screen, step-by-step view for actually cooking from your phone. Prev/Next
+  navigation between steps, a toggleable ingredients panel, and the screen stays awake the whole
+  time so it doesn't lock mid-recipe
 
 ### Meal Planning
 - Weekly view with day-by-day breakfast, lunch, dinner, and side slots
@@ -85,7 +90,8 @@ issues. Worth a skim if you're digging into the code.
   access it over a VPN/Tailscale instead of exposing plain HTTP to the internet.
 - Saved login credentials (used for the multi-account quick-switch on the login screen) are stored
   in `expo-secure-store` (Android Keystore-encrypted, excluded from Android app-data backups), not
-  plain AsyncStorage.
+  plain AsyncStorage. A "Remember this account" toggle on the Connect screen lets you skip saving
+  credentials on that device entirely, if you'd rather not have them stored at all.
 - Found a security issue? Open an issue, or a private security advisory if you'd rather not
   disclose it publicly first. This is a hobby project without a dedicated security contact, but
   reports are welcome and will be taken seriously.
