@@ -6,6 +6,8 @@ nothing in between. Point it at your server, sign in, and you're in.
 
 Built with React Native + Expo. Android is the main target right now, iOS support is on the roadmap.
 
+Website: [mealiego.voriseklabs.com](https://mealiego.voriseklabs.com)
+
 ## Features
 
 ### Recipes
