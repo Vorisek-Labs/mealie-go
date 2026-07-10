@@ -466,6 +466,86 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 **Session (latest) — 2026-07-10**
 
+### Session 2026-07-10 (part 2) — open source release, Play Store prep, prep/cook time + Cook Mode, v1.1.0
+Large session covering going public, Play Store asset prep, and a new feature batch.
+
+**Going public / security**
+- Made the repo public under the MIT License, scrubbed AI-authorship trailers and personal info
+  (device serial, absolute paths, personal emails) from CLAUDE.md before doing so.
+- Full security audit: moved `SavedAccount[]` (saved login credentials) from plaintext AsyncStorage
+  to `expo-secure-store` with a one-time migration; removed unused `RECORD_AUDIO`/
+  `SYSTEM_ALERT_WINDOW` permissions via `android.blockedPermissions`; documented the
+  `usesCleartextTraffic` tradeoff in the README instead of "fixing" it (breaks self-hosted `http://`
+  servers otherwise).
+- Added a **"Remember this account" toggle** on ConnectScreen — off by default it now skips saving
+  credentials entirely and actively purges any pre-existing saved entry for that server+username
+  (`removeAccount()` in `mealieApi.ts`), so security-conscious users aren't forced into the
+  quick-switch credential store.
+
+**Play Store prep**
+- Set up durable release signing (see Play Store Release Signing section above) and produced the
+  first signed AAB.
+- Built Play Store listing assets (icon, feature graphic, screenshots, listing copy) and a
+  marketing/privacy/terms website, **deployed to Cloudflare Pages at `mealiego.voriseklabs.com`**
+  (not `mealie.voriseklabs.com` — that subdomain was already in use by Ken's actual live Mealie
+  server; caught this before it caused a DNS conflict).
+- **`store/` and `website/` were moved out of this public repo** into a new private repo,
+  `Vorisek-Labs/mealie-go-private` — they're Play Store/marketing assets, not app source, and don't
+  belong in a public OSS repo. History was scrubbed with `git filter-repo` (force-pushed) so neither
+  directory is recoverable from old commits in the public repo either. `.gitignore` now excludes
+  both paths so they don't get re-added by accident. To edit the website going forward, clone
+  `mealie-go-private` separately — it's not part of this working directory's git history anymore.
+- Cut GitHub Releases `v1.0.0` and `v1.1.0` (signed release APK attached to each) as an
+  alternate/no-Play-Store-required download path for self-hosters.
+- Worked through the Play Console "App content" declarations with the user — notably: sign-in IS
+  required (the app does nothing without a connected Mealie server), which per Play's binary
+  App-access model means a **dedicated demo Mealie server + demo account still needs to be created**
+  for reviewer credentials (not the user's personal server) — this is unresolved, tracked as a
+  TODO. Data Safety "collects/shares required data types" was answered **No**, matching verified
+  live-Play-Store precedent from Nextcloud/Home Assistant (both self-hosted, zero-developer-backend
+  apps) despite Google's abstract "collect" wording being ambiguous about user-configured
+  third-party endpoints. Health features declared **none** — meal planning and nutrition display
+  are both passive/organizational, not the active tracking/goal-management Google's own category
+  definitions require.
+
+**New features**
+- Prep/Cook/Total time stats moved to right under the recipe title (previously below the
+  description).
+- **Cook time display bug fixed**: Mealie's own edit UI writes "Cook Time" to `performTime`, not
+  `cookTime` (confirmed against Mealie's actual schema/frontend source) — `cookTime` is a legacy
+  field only populated by URL-import scrapers. The app now reads `performTime` first, falls back to
+  `cookTime` for imported recipes. `RecipeEditScreen`'s "Cook Time" field now writes to
+  `performTime` too, so edits made in this app show up correctly in Mealie's own web UI.
+- Raw ISO 8601 duration text (e.g. `"PT30M"`, left over from an inconsistent upstream import) is
+  now reformatted to readable text (`"30 min"`) wherever time is displayed, instead of showing the
+  raw string.
+- **Separate Prep Time / Cook Time filters** (`src/lib/timeEstimate.ts`), each with independent
+  15/30/60/120-"min or less" buckets (inclusive — labels say "or less", not "under", to be
+  accurate), between Categories and Tags in the filter modal on both Recipes and Cookbook screens.
+  Mealie has no server-side time filter (prep/cook time are freeform text, not numeric), so this
+  pulls the full matching set and filters client-side, same trick already used for "favorites
+  only".
+- Fixed a layout bug where Prep/Cook/Total/Serves labels misaligned when one value wrapped to two
+  lines (e.g. "4 hours 5 minutes") — each stat's value now sits in a fixed two-line-tall centered
+  box so labels stay aligned regardless of value length.
+- **Cook Mode** (`src/components/CookModeModal.tsx`): full-screen step-by-step view, reachable via
+  a "👨‍🍳 Start Cooking" button at the top of a recipe's Steps tab. Prev/Next arrow navigation
+  (not Mealie's own side-by-side scroll layout — confirmed via research that Mealie's web Cook Mode
+  has no step-by-step arrows, this is a deliberate mobile-specific adaptation), a toggleable
+  ingredients panel (Mealie's web Cook Mode does show ingredients alongside steps, so this part
+  matches upstream), and `expo-keep-awake` keeps the screen on for as long as it's open — no
+  toggle, matches the explicit ask for "no screen turning off... while in cook mode".
+- Bumped to `1.1.0` / `versionCode: 2` for this batch.
+- Built + installed on device (`R5CN20KJXDL`), confirmed clean launches via logcat after every
+  change in this session. `npx tsc --noEmit` clean throughout.
+- **NEEDS DEVICE TESTING**: none of this batch's UI has had a live hands-on pass from the user
+  beyond what was already spot-checked mid-session (cook time display/filters/Cook Mode were
+  confirmed working; the layout/label fixes and v1.1.0 rebuild have NOT been re-verified on device
+  since the version bump).
+- **STANDING INSTRUCTION (added this session)**: any time an app update is made, all three of these
+  need updating together — the GitHub repo (`mealie-go`, source), the release APK attached to the
+  matching GitHub Release, and the AAB for Google Play Console. Don't let one lag the others.
+
 ### Session 2026-07-10 (part 1) — first signed release AAB, for Play Console upload
 - Generated the Play Store upload keystore (`mealie-go-upload-key.jks`, project root, gitignored)
   and wired up durable release signing — see the new Play Store Release Signing section above for
