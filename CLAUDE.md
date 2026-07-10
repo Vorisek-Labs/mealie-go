@@ -84,68 +84,113 @@ MealieGo/
     ├── types/
     │   └── index.ts               ← all TypeScript interfaces (Recipe, MealPlan, Shopping, etc.)
     ├── lib/
-    │   └── mealieApi.ts           ← Mealie API client: login(), api.*, recipeImageSource()
+    │   ├── mealieApi.ts           ← Mealie API client: login(), api.*, recipeImageSource()
+    │   ├── unitConversion.ts      ← client-side metric⇄original ingredient/temperature conversion
+    │   └── onboarding.ts          ← device-level "has seen welcome screen" flag (AsyncStorage)
     ├── context/
-    │   └── AuthContext.tsx        ← user, serverUrl, token, loading, signIn(), logout()
+    │   ├── AuthContext.tsx        ← user, serverUrl, token, loading, signIn(), logout(), silent token refresh
+    │   └── FavoritesContext.tsx   ← per-user favorite recipe ids, isFavorite(), toggleFavorite()
     ├── hooks/
-    │   ├── useRecipes.ts          ← list + search + pagination
+    │   ├── useRecipes.ts          ← list + search + pagination + tags/categories/tools/foods filters
     │   ├── useMealPlan.ts         ← week-bounded meal plan entries
     │   ├── useShoppingLists.ts    ← lists + useShoppingListDetail (items, toggle, delete)
-    │   └── useCookbooks.ts        ← useCookbooks + useCookbookRecipes
+    │   └── useCookbooks.ts        ← cookbooks + cookbook recipes + create/update/delete
     ├── navigation/
-    │   └── RootNavigator.tsx      ← auth gate + 5-tab navigator + nested stacks
+    │   ├── RootNavigator.tsx      ← auth gate → root stack (Welcome/MainTabs/Guide modal) → 5-tab navigator + nested stacks
+    │   └── navigateToGuide.ts     ← walks up parent navigators to reach the root-level Guide screen
     ├── components/
-    │   ├── RecipeCard.tsx         ← card with auth-gated image, calls useAuth() internally
+    │   ├── RecipeCard.tsx         ← card with auth-gated image + favorite heart, calls useAuth()/useFavorites()
     │   └── EmptyState.tsx         ← icon + title + subtitle
     └── screens/
         ├── auth/
         │   └── ConnectScreen.tsx  ← server URL + username + password → login
-        ├── RecipesScreen.tsx      ← list with search, + button → AddRecipe
-        ├── RecipeDetailScreen.tsx ← hero image, tabs: ingredients/instructions/notes
+        ├── WelcomeScreen.tsx      ← first-launch-only screen (root stack), "View Guide" or "Continue to App"
+        ├── GuideScreen.tsx        ← root-level modal, quick-reference sections, scrolls to a section via route param
+        ├── RecipesScreen.tsx      ← list, search, tag/category/tool/food filters, favorites-only toggle (full-server, not just loaded page), 🎲 random, 🥕 → Suggestions
+        ├── RecipeDetailScreen.tsx ← hero image (upload), tabs, favorite, share links, unit toggle, PDF export, add-to-shopping-list
+        ├── RecipeEditScreen.tsx   ← full edit form: name/desc/times/ingredients/steps/tags/categories/notes
+        ├── RecipeSuggestionsScreen.tsx   ← "What can I make?" — pick foods/tools on hand, see matching recipes, Clear All
         ├── AddRecipeScreen.tsx    ← modal: import URL or create manually
-        ├── MealPlanScreen.tsx     ← week strip + day entries by meal type
-        ├── ShoppingListsScreen.tsx       ← list of shopping lists
-        ├── ShoppingListDetailScreen.tsx  ← items with check-off + add bar
-        ├── CookbooksScreen.tsx    ← 2-col grid of cookbook cards
-        ├── CookbookDetailScreen.tsx      ← recipes in a cookbook
-        └── SettingsScreen.tsx     ← server info, user info, sign out
+        ├── MealPlanScreen.tsx     ← week strip + day entries by meal type, add/remove entries, "?" → Guide
+        ├── ShoppingListsScreen.tsx       ← list of shopping lists, "?" → Guide
+        ├── ShoppingListDetailScreen.tsx  ← items with check-off + add bar, add from meal plan or from multi-selected recipes
+        ├── CookbooksScreen.tsx    ← 2-col grid, create/edit/delete cookbooks
+        ├── CookbookDetailScreen.tsx      ← recipes in a cookbook, same search/filter/🎲 random as main Recipes list (uses useRecipes(slug))
+        └── SettingsScreen.tsx     ← server info, user info, unit system preference, guide link, sign out
 ```
+
+### Shared recipe list/filter pieces (used by both RecipesScreen and CookbookDetailScreen)
+- `hooks/useRecipes.ts` — takes an optional `cookbookSlug` to scope every fetch to one cookbook.
+- `hooks/useRecipeFilterOptions.ts` — lazy-loads tags/categories/tools/foods once; exports
+  `filterOptionName()` for turning a filter's slug/id back into a display name.
+- `components/RecipeFilterModal.tsx` — the tag/category/tool/food picker modal, fully controlled
+  (`visible/loading/options/filters/onApply/onClose`), used identically by both screens.
+- `components/ActiveFilterChips.tsx` — the removable pill row shown under the search bar.
+- `api.getRecipes()` / `api.getRandomRecipe()` both take an optional `cookbook` param that combines
+  with `tags`/`categories`/`tools`/`foods`/`search` in the same request (confirmed against Mealie's
+  recipe list route — cookbook and the organizer filters aren't mutually exclusive).
 
 ---
 
 ## Design System
 
-### Theme — Herb Green, Dark Mode First
+### Theme — Warm Terracotta/Orange, Dark Mode First
+
+The palette actually shipped (in `src/theme/index.ts`) is a warm orange-on-near-black scheme
+matching the app icon, not the herb-green palette originally planned here — this doc previously
+described the wrong colors. Current values:
 
 ```typescript
 // src/theme/index.ts
-colors.background      = '#0D110D'   // deep dark with slight green tint
-colors.surface         = '#171D17'
-colors.surfaceElevated = '#1E261E'
+colors.background      = '#0F0D0A'
+colors.surface         = '#1A1510'
+colors.surfaceElevated = '#251C14'
 
-colors.primary         = '#5DAA7A'   // herb/sage green
-colors.primaryLight    = '#7BC49A'
-colors.primaryDark     = '#3D8A5A'
-colors.accent          = '#E07B54'   // warm terracotta
+colors.primary         = '#E87830'   // orange
+colors.primaryLight    = '#F09850'
+colors.primaryDark     = '#C45C18'
+colors.accent          = '#4E9E8C'   // muted teal
 
-colors.textPrimary     = '#F0F4F0'
-colors.textSecondary   = '#8EA48E'
-colors.textDisabled    = '#4A5A4A'
-colors.textInverse     = '#0D110D'
+colors.textPrimary     = '#F4F0EC'
+colors.textSecondary   = '#9A8070'
+colors.textDisabled    = '#52403A'
+colors.textInverse     = '#0F0D0A'
 
-colors.tabBarActive    = '#5DAA7A'
-colors.tabBarInactive  = '#4A5A4A'
+colors.tabBarActive    = '#E87830'
+colors.tabBarInactive  = '#4A3428'
 ```
 
-### Navigation — 5 Bottom Tabs + Nested Stacks
+### Navigation — Root Stack → 5 Bottom Tabs + Nested Stacks
+
+`RootNavigator` is a root-level stack (`Welcome` / `MainTabs` / `Guide`) sitting above the tab
+navigator, not just the tab navigator directly — this exists so the onboarding Welcome screen and
+the Guide modal can be reached from anywhere without living inside any one tab. `Welcome` is only
+ever the initial route on a fresh install (see Onboarding section below); everyday app usage
+mounts straight into `MainTabs`.
 
 | Tab | Stack screens |
 |---|---|
-| Recipes 🍽️ | RecipesList → RecipeDetail, AddRecipe (modal) |
+| Recipes 🍽️ | RecipesList → RecipeDetail, AddRecipe (modal), RecipeEdit |
 | Meal Plan 📅 | Single screen (no nested stack) |
 | Shopping 🛒 | ShoppingLists → ShoppingListDetail |
 | Cookbooks 📖 | CookbooksList → CookbookDetail |
 | Settings ⚙️ | Single screen |
+
+### Onboarding (Welcome + Guide)
+- **Welcome screen**: shown once, immediately after an explicit sign-in — never for a session
+  auto-restored from a saved token on cold start (gated on `AuthContext.justSignedIn`, in-memory
+  only, true only inside `signIn()`), AND only if never dismissed before (AsyncStorage flag in
+  `lib/onboarding.ts`, device-level — not tied to any one account, so signing out and into a
+  different server won't show it again). Both conditions must hold: `showWelcome = justSignedIn
+  && !hasSeenWelcome`. Buttons: "View Quick Guide" (→ Guide, with `MainTabs` underneath so closing
+  it lands in the app) or "Continue to App".
+- **Guide screen**: reachable any time from Settings ("How to Use Mealie Go"), and from small "?"
+  buttons on MealPlanScreen and ShoppingListsScreen headers that jump straight to that section.
+  Implemented as a `RootStack` modal; `navigateToGuide(navigation, section?)` walks up parent
+  navigators via `getParent()` until it finds the one with `Guide` in its route names, so it works
+  correctly from screens nested inside a tab's own stack, not just flat tab screens.
+- To add a new guide section: add an entry to `SECTIONS` in `GuideScreen.tsx` and to the
+  `GuideSection` union in `navigateToGuide.ts`.
 
 ---
 
@@ -157,16 +202,46 @@ Base URL: whatever the user entered on ConnectScreen.
 ### Recipes
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/api/recipes` | `?page=1&perPage=50&search=&orderBy=name` |
+| GET | `/api/recipes` | `?page=1&perPage=50&search=&orderBy=name` — filters: repeatable `categories=`, `tags=`, `tools=` (slugs) and `foods=` (**UUIDs** — foods have no slug) |
 | GET | `/api/recipes/{slug}` | Full recipe with ingredients + instructions |
 | POST | `/api/recipes` | Body: `{ name }` → returns slug string |
 | POST | `/api/recipes/create-url` | Body: `{ url }` → returns slug string |
 | PUT | `/api/recipes/{slug}` | Full recipe body |
 | DELETE | `/api/recipes/{slug}` | |
 
-### Images
-`{serverUrl}/api/media/recipes/{slug}/images/original.webp`
-Requires `Authorization: Bearer <token>` header. Use `recipeImageSource(serverUrl, token, slug)` from `mealieApi.ts` which returns `{ uri, headers }` for the Image source prop.
+### Images & Assets (CRITICAL: use recipe UUID, not slug)
+`{serverUrl}/api/media/recipes/{recipeId}/images/original.webp`
+`{serverUrl}/api/media/recipes/{recipeId}/assets/{fileName}`
+Media endpoints take the recipe **UUID** (`recipe.id`), NOT the slug — a slug returns a 422
+"input should be a valid uuid" error. Use `recipeImageSource(serverUrl, token, recipe.id, recipe.image)`
+from `mealieApi.ts` which returns `{ uri, headers }` for the Image source prop — the 4th arg
+(`recipe.image`, Mealie's own cache-key/version string) busts the RN Image cache after a re-upload.
+
+| Method | Path | Notes |
+|---|---|---|
+| PUT | `/api/recipes/{slug}/image` | Multipart: `image` (file) + `extension` (form field). Returns `{ image: <newVersion> }`. Uses **slug** here, unlike the read path above. |
+| POST | `/api/recipes/{slug}/assets` | Multipart: `name`, `icon` (mdi-* string), `extension`, `file`. Returns `RecipeAsset`. |
+
+### Favorites & Ratings (per-user, NOT the same as `recipe.rating`)
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/users/{userId}/favorites` | Returns `{ ratings: [{ recipeId, rating, isFavorite }] }` |
+| POST/DELETE | `/api/users/{userId}/favorites/{slug}` | Add/remove favorite |
+
+Note: `recipe.rating` (used by the existing star-rating UI via `PUT /api/recipes/{slug}`) is a
+separate, older field from the per-user favorites/ratings system above. Left as-is since it's
+shipped and working — don't conflate the two without testing against a live server first.
+
+### Share Links (public, no-login recipe view)
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/shared/recipes?recipe_id=` | List this recipe's share tokens |
+| POST | `/api/shared/recipes` | Body: `{ recipeId, expiresAt }` (ISO date, defaults to +30 days) |
+| DELETE | `/api/shared/recipes/{id}` | Revoke a share link |
+
+Public link format for recipients (Vue SPA route, not an API route):
+`{serverUrl}/g/{groupSlug}/shared/r/{tokenId}` — `groupSlug` comes from `UserProfile.groupSlug`
+(`GET /api/users/self` field `group_slug`).
 
 ### Meal Plans
 | Method | Path | Notes |
@@ -186,41 +261,89 @@ Requires `Authorization: Bearer <token>` header. Use `recipeImageSource(serverUr
 | POST | `/api/households/shopping/items` | Body: `{ shoppingListId, note, isFood, checked }` |
 | PUT | `/api/households/shopping/items/{id}` | Full item body to update |
 | DELETE | `/api/households/shopping/items/{id}` | |
+| POST | `/api/households/shopping/lists/{id}/recipe` | **Body is a JSON array**, even for one recipe: `[{ recipeId, recipeIncrementQuantity }]`. Omit `recipeIngredients` and the server pulls each recipe's full ingredient list itself. The original code here sent a bare object instead of an array — would have 422'd the first time it was actually exercised; fixed as `api.addRecipesToShoppingList()`. There's also a deprecated singular `/recipe/{recipe_id}` route; don't use it, the bulk one replaces it. |
+
+### Recipe Suggestions ("What can I make?")
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/recipes/suggestions?foods=&tools=&limit=` | `foods`/`tools` are repeatable UUID query params (the ones the user picked for this query). Returns `{ items: [{ recipe, missingFoods, missingTools }] }`. Also honors persistent per-household "on hand" flags (`includeFoodsOnHand`/`includeToolsOnHand`, default true) — we don't expose a UI for setting persistent on-hand status, only the per-query food/tool picker in `RecipeSuggestionsScreen`. |
+
+### Organizers (filter option lists)
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/organizers/tags` | `?perPage=200` |
+| GET | `/api/organizers/categories` | `?perPage=200` |
+| GET | `/api/organizers/tools` | `?perPage=200` |
+| GET | `/api/foods` | `?perPage=1000` — filter by `foods=` uses the food **id** (UUID) |
 
 ### Cookbooks
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/api/households/cookbooks` | `?perPage=50` |
 | GET | `/api/recipes?cookbook={slug}` | Recipes in a cookbook |
+| POST | `/api/households/cookbooks` | Body (`CookbookInput`): `{ name, description, public, position, queryFilterString }` |
+| PUT | `/api/households/cookbooks/{id}` | **Full replace**, not a patch — resend all fields |
+| DELETE | `/api/households/cookbooks/{id}` | |
+
+Mealie's newer cookbooks are backed by a `queryFilterString` (query-builder syntax) rather than a
+manual recipe list. We don't build a query-filter UI — cookbooks created in-app default to an
+empty filter string, same as the "no filter" default.
 
 ### Auth / User
 | Method | Path | Notes |
 |---|---|---|
 | POST | `/api/auth/token` | Form data (NOT JSON): `username, password, remember_me` |
-| GET | `/api/users/self` | Returns UserProfile |
-| GET | `/api/auth/refresh` | Refresh token if needed (not yet wired up) |
+| GET | `/api/users/self` | Returns UserProfile (includes `groupSlug`, used for share links) |
+| GET | `/api/auth/refresh` | Re-signs a **still-valid** token for a fresh one. Cannot recover an already-expired token — must be called proactively, not reactively on 401. `AuthContext` calls this every 6h and on app-foreground. |
+
+### Unit system toggle & PDF export — no server API, done client-side
+Mealie's own server-side unit-conversion feature (`GET /api/recipes/{slug}/conversions`) was an
+**unmerged, unreleased PR** as of 2026-07 (targets `mealie-next`, not in any stable release) — do
+not build against it, it'll break for most self-hosted servers. Instead `src/lib/unitConversion.ts`
+does a simple client-side original⇄metric conversion (volume/mass unit tables + °F→°C regex on
+instruction text), toggled from Settings or the ingredients tab, stored in AsyncStorage.
+Similarly, Mealie has no server-side PDF export (the web UI just uses browser print) — recipe PDF
+export is generated on-device with `expo-print` + shared via `expo-sharing`.
 
 ---
 
 ## Build Commands
 
 ```powershell
-# Confirm phone is connected (serial: R5CN20KJXDL)
+# Confirm phone is connected
 adb devices
 
 # Install dependencies (first time)
-cd C:\Users\Ken_R\MealieGo
+cd path/to/mealie-go
 npm install
 npx expo prebuild   ← only needed first time or when adding native packages
 
 # Build release APK
-cd C:\Users\Ken_R\MealieGo\android
+cd path/to/mealie-go/android
 .\gradlew assembleRelease
-adb -s R5CN20KJXDL install -r app\build\outputs\apk\release\app-release.apk
+adb -s YOUR_DEVICE_SERIAL install -r app\build\outputs\apk\release\app-release.apk
 ```
 
 **DO NOT use `npx expo run:android`** — registers phantom emulator-5562.
 **DO NOT run `npx expo prebuild`** unless a new native package was just added.
+When adding a native package, use `npx expo install <pkg>` (picks the SDK-53-compatible version)
+then `npx expo prebuild --platform android` — this regenerates `android/` from `app.json` +
+`assets/`, including the app icon, so it's safe to re-run after fixing icon assets too.
+
+**Gotcha (bit us 2026-07-09): run `npx expo install --check` after ANY `npm install`.**
+A package already in `package.json` (expo-image-picker) had drifted to a version incompatible
+with the installed Expo SDK — its native module used an old config schema the current autolinking
+no longer reads, so it silently failed to link and crashed on first JS access with
+`Cannot find native module 'Exponent...'`. `npx expo install --fix` resolves this; always verify
+with `--check` before assuming a crash after adding/updating packages is something else.
+
+**Gotcha: `android.usesCleartextTraffic` in app.json stopped being auto-applied** (needed for
+`http://` self-hosted servers — Android 9+/API 28+ blocks cleartext by default). Newer Expo
+tooling dropped support for that bare top-level key; it's now set via the `expo-build-properties`
+plugin instead (see `app.json`'s plugins array: `["expo-build-properties", {"android": {"usesCleartextTraffic": true}}]`).
+If login ever starts failing with a generic network error again, check
+`android/app/src/main/AndroidManifest.xml` for `android:usesCleartextTraffic="true"` on the
+`<application>` tag after a prebuild — if it's missing, this is why.
 
 Other commands:
 ```powershell
@@ -230,28 +353,26 @@ npx tsc --noEmit      # type check
 
 ---
 
-## Assets Bootstrap
+## Assets
 
-The `assets/` folder needs PNG files before you can build. Copy from Kindling as placeholders:
-
-```powershell
-copy C:\Users\Ken_R\Kindling\assets\icon.png C:\Users\Ken_R\MealieGo\assets\
-copy C:\Users\Ken_R\Kindling\assets\adaptive-icon.png C:\Users\Ken_R\MealieGo\assets\
-copy C:\Users\Ken_R\Kindling\assets\splash.png C:\Users\Ken_R\MealieGo\assets\
-copy C:\Users\Ken_R\Kindling\assets\favicon.png C:\Users\Ken_R\MealieGo\assets\
-```
-
-Replace with real Mealie Go branded assets before Play Store submission.
+`assets/icon.png` and `assets/adaptive-icon.png` are the real Mealie Go branded icon (dark rounded
+tile, orange phone + fork/knife glyph) — no longer Kindling placeholders. Both were regenerated
+2026-07-09 to shrink the glyph to ~62% of the canvas so it isn't clipped by Android's adaptive-icon
+mask (was previously full-bleed, which cropped the phone outline top/bottom on the home screen).
+If regenerating again: crop to content bbox, scale to a safe fraction (~60-66%), recenter — Android's
+adaptive-icon safe zone is the center 66% of the canvas, so anything larger risks clipping.
 
 ---
 
-## Shared Infrastructure Accounts
+## Infrastructure
 
-| Service | Account | Notes |
-|---|---|---|
-| GitHub | github.com/Vorisek-Labs | Create repo: Vorisek-Labs/mealie-go |
-| Google Play Console | voriseklabs@gmail.com | Package: com.voriseklabs.mealinego |
-| Apple Developer | voriseklabs@gmail.com | Bundle: com.voriseklabs.mealinego |
+| Service | Notes |
+|---|---|
+| GitHub | github.com/Vorisek-Labs/mealie-go |
+| Google Play Console | Package: `com.voriseklabs.mealinego` |
+| Apple Developer | Bundle: `com.voriseklabs.mealinego` |
+
+Publisher account credentials for the above are kept locally, not in this repo.
 
 No Supabase, no RevenueCat, no AdMob, no Cloudflare Worker needed for this app.
 The app is free, open-source feel — no subscriptions, no ads.
@@ -273,14 +394,149 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 ## Current Build Status
 
+**Session (latest) — 2026-07-09**
+
+### Session 2026-07-09 (part 5) — onboarding: Welcome screen + in-app Guide
+- **Welcome screen** — shown once, the first time the app has a logged-in user after install
+  (`lib/onboarding.ts` AsyncStorage flag, device-level, survives logout/re-login). "View Quick
+  Guide" or "Continue to App".
+- **Guide screen** — a root-level modal with quick-reference sections (Recipes, Meal Plan,
+  Shopping, Cookbooks, Settings). Reachable from Settings ("How to Use Mealie Go"), and from small
+  unobtrusive "?" buttons in the MealPlan and Shopping headers that scroll straight to that
+  section via a route param.
+- Restructured `RootNavigator` to add a root-level `RootStack` (Welcome/MainTabs/Guide) above the
+  tab navigator — needed so Guide/Welcome aren't stuck inside any one tab's own nested stack.
+  `navigateToGuide()` walks up parent navigators dynamically to reach it from anywhere.
+- Built + installed on device (YOUR_DEVICE_SERIAL), confirmed clean launch via logcat. `npx tsc --noEmit` clean.
+- NEEDS DEVICE TESTING: fresh-install Welcome flow (hard to test without wiping app data), both "?"
+  guide links scroll to the right section, Settings guide link.
+
+### Session 2026-07-09 (part 7) — cookbook filtering, random recipe, favorites/filter-icon polish
+User feedback after trying part 6's features:
+- **Fixed**: "favorites only" toggle on RecipesScreen was filtering client-side over only the
+  currently-*loaded* page of `recipes`, so favorites set via Mealie's own web UI (or just
+  alphabetically past what had been paginated in) never showed even though the favorite flag
+  itself was fetched correctly. Now fetches the full matching recipe set (`perPage: 1000`,
+  respecting current search/filters) whenever favorites-only is active, instead of relying on
+  pagination state that was never meant to represent "everything."
+- **Changed**: filter button icon `⚙` → `▤` — the gear read as generic app settings (and visually
+  collided with the actual Settings tab) rather than "filter."
+- **Added**: Clear All button on `RecipeSuggestionsScreen`'s ingredient/tool picker — deselecting
+  many chips one at a time was the friction point called out.
+- **Extracted** `useRecipeFilterOptions`, `RecipeFilterModal`, `ActiveFilterChips` (see Shared
+  recipe list/filter pieces above) so CookbookDetailScreen could get the same filtering as the
+  main list without copy-pasting ~200 lines. `useRecipes` now takes an optional cookbook slug.
+- **Added to CookbookDetailScreen**: search, tag/category/tool/food filters, 🎲 random-within-
+  cookbook — confirmed via Mealie's source that `cookbook` combines with the organizer filters in
+  one request, so this wasn't just possible but a single shared implementation. Mealie's own web
+  app doesn't offer this inside a cookbook, so this is ahead of upstream here.
+- **Added**: 🎲 random-recipe button on the main RecipesScreen too (`api.getRandomRecipe()`
+  generalized to accept the same filter/cookbook params as `getRecipes()`, so "random" always
+  respects whatever search/filters are currently active).
+- Removed `api.getCookbookRecipes()` / `useCookbookRecipes()` — fully superseded by
+  `api.getRecipes({ cookbook })` / `useRecipes(cookbookSlug)`.
+- Built + installed on device (YOUR_DEVICE_SERIAL), confirmed clean launch via logcat. `npx tsc --noEmit` clean.
+- NEEDS DEVICE TESTING: all of the above, especially the favorites fix (needs a Mealie account
+  with favorites set via the web UI to actually verify) and cookbook filtering/random.
+
+### Session 2026-07-09 (part 6) — fixed Welcome-before-login bug, wired 2 more real Mealie features
+User caught the Welcome screen appearing on an auto-restored session (before any conscious login
+action) and asked to confirm/wire two features they remembered from Mealie proper:
+- **Fixed**: Welcome now gated on `AuthContext.justSignedIn` (true only inside `signIn()`, never
+  during `checkSession()`'s auto-restore) AND the persisted `hasSeenWelcome` flag — see Onboarding
+  section above.
+- **Confirmed real via Mealie source** (both were completely unwired in our app before this):
+  multi-recipe shopping list building (`POST .../lists/{id}/recipe`, bulk array body) and
+  ingredient/tool-based recipe suggestions (`GET /api/recipes/suggestions`) — see API Reference.
+- **Added**: "🍽 From Recipes" on ShoppingListDetailScreen — search, multi-select recipes, add all
+  their ingredients in one request. Also fixed `addRecipeToShoppingList`'s pre-existing bug (sent
+  a bare object where the API requires a JSON array — would have 422'd, never actually exercised
+  before this) and consolidated `generateFromMealPlan` onto the same corrected bulk call.
+- **Added**: new `RecipeSuggestionsScreen` ("🥕 What Can I Make?", reachable from the Recipes tab
+  header) — pick foods/tools you have, see suggested recipes with what's missing called out.
+- **Added**: "Add Ingredients to Shopping List" button on RecipeDetailScreen's ingredients tab —
+  this was already *claimed* in the Guide's Recipes section from part 5 but never actually built;
+  fixed the claim by building it rather than walking back the text.
+- Updated Guide content in both the Recipes and Shopping sections to describe all of the above.
+- Built + installed on device (YOUR_DEVICE_SERIAL), confirmed clean launch via logcat. `npx tsc --noEmit` clean.
+- NEEDS DEVICE TESTING: all of the above, plus re-verify the Welcome timing fix (sign out and back
+  in — should show Welcome; force-quit and reopen while still signed in — should not).
+
+### Session 2026-07-09 (part 4) — fixed post-feature-push crash + login network error
+Two bugs surfaced only after real device use of part 3's changes:
+- **App crashed on launch**: `expo-image-picker` (already in package.json pre-session, at 16.0.6)
+  had drifted out of sync with Expo SDK 53 — incompatible native module config schema, so
+  `ExponentImagePicker` never linked, crashing the instant JS touched it. Two other packages
+  (`expo-secure-store`, `expo-system-ui`) were quietly outdated the same way. Fixed via
+  `npx expo install --fix` + full `expo prebuild --clean` + rebuild. See the Gotcha callout in
+  Build Commands — **run `npx expo install --check` after any `npm install`**.
+- **Login failed with a network error** even with correct credentials: the `expo prebuild --clean`
+  above pulled in newer Expo tooling that no longer auto-applies the top-level
+  `android.usesCleartextTraffic` app.json key (needed since the user's server is `http://`, and
+  Android blocks cleartext by default). Fixed by installing `expo-build-properties` and setting
+  `usesCleartextTraffic` through its plugin config instead — see Gotcha callout in Build Commands.
+- Crash fix confirmed via logcat (clean launch, no native-module errors). The cleartext fix was
+  verified by confirming the manifest attribute is present after rebuild — **not yet confirmed
+  against the user's real server**; if login still fails, check that attribute first (see Gotcha).
+
+### Session 2026-07-09 (part 3) — feature-parity push: uploads, cookbooks, favorites, share links, units, PDF
+Added everything identified as missing vs. the Mealie web app, per user request:
+- **Recipe image upload/replace** — camera icon on the hero image (RecipeDetailScreen), Alert
+  action sheet → camera or library via `expo-image-picker` → `api.updateRecipeImage()`.
+- **Attachment upload** — "+ Add" in the Attachments section, `expo-document-picker` → any file
+  type → `api.uploadRecipeAsset()`.
+- **Cookbook create/edit/delete** — CookbooksScreen: "+" to create, long-press card for Edit/Delete,
+  name + description + public toggle. `useCookbooks` gained `createCookbook`/`updateCookbook`/`deleteCookbook`.
+- **Silent JWT refresh** — `AuthContext` calls `/api/auth/refresh` every 6h and on app-foreground
+  (AppState listener). Non-fatal if it fails; existing token keeps working until it actually expires.
+- **Favorites** — new `FavoritesContext` (loads `/api/users/{id}/favorites` once, shared across
+  screens). Heart toggle on `RecipeCard` and `RecipeDetailScreen`; "favorites only" filter button
+  in the Recipes header (client-side filter over already-loaded pages).
+- **Share links** — Share button on RecipeDetailScreen now opens a modal to create/list/revoke
+  `/api/shared/recipes` tokens and share the public `{serverUrl}/g/{groupSlug}/shared/r/{token}` URL.
+  Replaced the old (broken — hardcoded `/g/home/r/`) share behavior.
+- **Unit system toggle** — client-side only (see API Reference section for why). Toggle in
+  Settings and inline on the ingredients tab; converts ingredient quantities + instruction
+  temperatures for display only, never writes back to the recipe.
+- **Recipe PDF export** — "PDF" button on RecipeDetailScreen, builds an HTML recipe sheet
+  (fetches the image as a base64 data URI first, auth headers don't survive into `expo-print`'s
+  renderer otherwise), `Print.printToFileAsync` → `Sharing.shareAsync`.
+- New native deps: `expo-image-picker` (was already installed, unused — now used), `expo-document-picker`,
+  `expo-print`, `expo-sharing`. Ran `npx expo prebuild --platform android` to link them + regenerate
+  the icon (still correct — prebuild reads from the already-fixed `assets/adaptive-icon.png`).
+- Built + installed on device (YOUR_DEVICE_SERIAL). `npx tsc --noEmit` clean throughout.
+- NEEDS DEVICE TESTING: all of the above — none of it has been exercised against a real Mealie
+  server yet. Pay particular attention to: image/attachment upload permissions prompts, share link
+  format against the user's actual `groupSlug`, PDF export image embedding.
+
+### Session 2026-07-09 (part 2) — app icon safe-zone fix
+- FIXED: home screen icon clipped the phone outline top/bottom. Root cause: source icon was a
+  full-bleed 1024×1024 design (touching all 4 edges), but Android's adaptive-icon mask only
+  guarantees the center ~66% is visible. Regenerated `assets/icon.png` + `assets/adaptive-icon.png`
+  and all `android/.../mipmap-*/ic_launcher*` files with the glyph shrunk to ~62%, recentered.
+
+### Session 2026-07-09 (part 1) — media URL fix + tools/foods filters
+- FIXED: recipe images not displaying + attachments failing with 422 UUID error.
+  Root cause: media endpoints (`/api/media/recipes/{recipeId}/...`) take the recipe
+  **UUID**, not the slug. `recipeImageUrl`, `recipeImageSource`, `recipeAssetUrl` now
+  take `recipe.id`; RecipeCard and RecipeDetailScreen updated. Images now sent with
+  Bearer auth header via `recipeImageSource`.
+- ADDED: filter recipes by **tools** and **foods** (alongside existing tags/categories).
+  New API calls `api.getTools()` (`/api/organizers/tools`) and `api.getFoods()` (`/api/foods`).
+  `getRecipes` now accepts `tools` (slugs) and `foods` (UUIDs) params.
+  `useRecipes` refactored to a single `RecipeFilters` object; filter modal has 4 chip
+  sections via shared `ChipSection` component. New `RecipeTool` type.
+- Built + installed on device (YOUR_DEVICE_SERIAL). `npx tsc --noEmit` clean.
+- NEEDS DEVICE TESTING: images on recipe list/detail, attachment open, tools/foods filters.
+
 **Session 1 — 2026-06-29**
 
 ### Setup
-- [ ] npm install (not yet run)
-- [ ] Assets copied from Kindling
-- [ ] `npx expo prebuild` (not yet run — needed before first ADB build)
-- [ ] First ADB build
-- [ ] App launches on device
+- [x] npm install
+- [x] Assets copied from Kindling
+- [x] `npx expo prebuild`
+- [x] ADB build
+- [x] App launches on device
 
 ### What's been written (Session 1)
 All source files scaffolded and ready for `npm install + prebuild`:
@@ -320,28 +576,36 @@ All source files scaffolded and ready for `npm install + prebuild`:
 - [x] EmptyState.tsx
 
 ### Next Session — Pick up here:
-1. Copy assets from Kindling (see Assets Bootstrap above)
-2. `cd C:\Users\Ken_R\MealieGo && npm install`
-3. `npx expo prebuild` → generates android/ folder
-4. Build APK and install on device
-5. Run `npx tsc --noEmit` and fix any type errors
-6. Test ConnectScreen with real Mealie server (once server is set up)
-7. Fix any bugs found during real device testing
+1. Confirm login now works against the user's real (http://) server — the cleartext-traffic fix
+   was verified in the manifest but not yet against a live login attempt.
+2. Device-test everything from part 3 (uploads, cookbooks, favorites, share links, units, PDF),
+   part 5 (Welcome/Guide), part 6 (Welcome timing fix, shopping-list-from-recipes, What Can I
+   Make?, recipe → shopping list button), and part 7 (favorites-only fix, cookbook filtering,
+   random recipe button) — none of it has been exercised live yet.
+3. Fix any bugs found during real device testing
 
 ### Package versions pinned (do not change without testing)
 - expo-asset: ~11.1.7 — REQUIRED, omitting it causes `Cannot find native module 'ExpoAsset'` crash on launch
-- usesCleartextTraffic: true in app.json android section — REQUIRED for http:// local server connections (Android 9+ blocks cleartext HTTP by default)
 - react-native: 0.79.6
 - react-native-screens: ~4.11.1
 - react-native-safe-area-context: 5.4.0
+- expo-image-picker, expo-document-picker, expo-print, expo-sharing — added 2026-07-09 for
+  photo/attachment upload + PDF export; installed via `npx expo install` (SDK-53-matched versions).
+  Run `npx expo install --check` after any `npm install` — see Gotcha in Build Commands, one of
+  these silently drifted out of SDK compatibility mid-session and crashed the app.
+- expo-build-properties — added 2026-07-09, now the only supported way to set
+  `android.usesCleartextTraffic` (see Gotcha in Build Commands; the bare app.json key stopped working)
 
 ### Known issues / TODO
-- Token refresh not implemented — if JWT expires, user must sign out and reconnect
-- Meal plan "Add entry" button not yet implemented (read-only view for now)
-- Recipe editing (full edit form) not yet implemented — import/create only
 - No offline caching yet (Mealient had Room DB; we could add AsyncStorage caching later)
-- Mealie server needs to be set up by Ken before the app can be fully tested
+- Cookbook create/edit only sets name/description/public — no UI for the `queryFilterString`
+  query-builder that newer Mealie cookbooks use to auto-populate recipes
+- Unit system toggle only recognizes common US customary units (tsp/tbsp/cup/oz/lb/etc.) converted
+  to metric — no true UK-imperial distinction, and unrecognized units pass through unchanged
+- Star rating still uses the older `recipe.rating` field via full recipe PUT, not the newer
+  per-user `/api/users/{id}/ratings/{slug}` endpoint used by favorites — works but is a different
+  mechanism than favorites; left alone since it's shipped and not reported broken
 
 ---
 
-*Last updated: 2026-06-29*
+*Last updated: 2026-07-09*

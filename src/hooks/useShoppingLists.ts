@@ -88,7 +88,14 @@ export function useShoppingListDetail(listId: string) {
         .filter(e => e.recipeId)
         .map(e => e.recipeId as string)
     )];
-    await Promise.all(recipeIds.map(id => api.addRecipeToShoppingList(listId, id)));
+    if (recipeIds.length === 0) return;
+    await api.addRecipesToShoppingList(listId, recipeIds);
+    await refresh();
+  }, [listId, refresh]);
+
+  const addRecipes = useCallback(async (recipeIds: string[]) => {
+    if (recipeIds.length === 0) return;
+    await api.addRecipesToShoppingList(listId, recipeIds);
     await refresh();
   }, [listId, refresh]);
 
@@ -132,6 +139,6 @@ export function useShoppingListDetail(listId: string) {
   return {
     list, labels, loading, error, refresh,
     addItem, toggleItem, deleteItem,
-    generateFromMealPlan, mergeDuplicates, duplicateCount,
+    generateFromMealPlan, addRecipes, mergeDuplicates, duplicateCount,
   };
 }

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, FlatList, StyleSheet, Text,
+  ActivityIndicator, Alert, FlatList, Modal, StyleSheet, Text,
   TextInput, TouchableOpacity, View, ScrollView,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,7 +9,7 @@ import { useShoppingListDetail } from '../hooks/useShoppingLists';
 import { api } from '../lib/mealieApi';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
-import type { ShoppingListItem } from '../types';
+import type { RecipeSummary, ShoppingListItem } from '../types';
 import type { ShoppingStackParams } from '../navigation/RootNavigator';
 
 type Props = {
@@ -39,13 +39,21 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
   const {
     list, labels, loading, error, refresh,
     addItem, toggleItem, deleteItem,
-    generateFromMealPlan, mergeDuplicates, duplicateCount,
+    generateFromMealPlan, addRecipes, mergeDuplicates, duplicateCount,
   } = useShoppingListDetail(listId);
 
   const [newItem, setNewItem] = useState('');
   const [newQty, setNewQty] = useState('');
   const [adding, setAdding] = useState(false);
   const [generating, setGenerating] = useState(false);
+
+  const [showAddRecipes, setShowAddRecipes] = useState(false);
+  const [recipeSearch, setRecipeSearch] = useState('');
+  const [recipeResults, setRecipeResults] = useState<RecipeSummary[]>([]);
+  const [recipeSearching, setRecipeSearching] = useState(false);
+  const [selectedRecipeIds, setSelectedRecipeIds] = useState<Set<string>>(new Set());
+  const [addingRecipes, setAddingRecipes] = useState(false);
+  const recipeSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleAdd = async () => {
     const note = newItem.trim();
@@ -82,6 +90,51 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Could not generate from meal plan');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const openAddRecipes = () => {
+    setRecipeSearch('');
+    setRecipeResults([]);
+    setSelectedRecipeIds(new Set());
+    setShowAddRecipes(true);
+  };
+
+  const handleRecipeSearch = useCallback((term: string) => {
+    setRecipeSearch(term);
+    if (recipeSearchTimer.current) clearTimeout(recipeSearchTimer.current);
+    if (!term.trim()) { setRecipeResults([]); return; }
+    recipeSearchTimer.current = setTimeout(async () => {
+      setRecipeSearching(true);
+      try {
+        const data = await api.getRecipes({ search: term, perPage: 20 });
+        setRecipeResults(data.items);
+      } catch {
+        setRecipeResults([]);
+      } finally {
+        setRecipeSearching(false);
+      }
+    }, 400);
+  }, []);
+
+  const toggleRecipeSelected = (id: string) => {
+    setSelectedRecipeIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleAddSelectedRecipes = async () => {
+    if (selectedRecipeIds.size === 0) return;
+    setAddingRecipes(true);
+    try {
+      await addRecipes([...selectedRecipeIds]);
+      setShowAddRecipes(false);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not add recipes to this list');
+    } finally {
+      setAddingRecipes(false);
     }
   };
 
@@ -175,6 +228,9 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
             : <Text style={styles.actionBtnText}>🗓 From Meal Plan</Text>
           }
         </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} onPress={openAddRecipes}>
+          <Text style={styles.actionBtnText}>🍽 From Recipes</Text>
+        </TouchableOpacity>
         {duplicateCount > 0 && (
           <TouchableOpacity style={styles.mergeBtn} onPress={handleMergeDuplicates}>
             <Text style={styles.mergeBtnText}>Merge {duplicateCount} dupes</Text>
@@ -259,6 +315,77 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
           }
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showAddRecipes}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowAddRecipes(false)}
+      >
+        <View style={addRecipesStyles.container}>
+          <View style={addRecipesStyles.header}>
+            <TouchableOpacity onPress={() => setShowAddRecipes(false)}>
+              <Text style={addRecipesStyles.cancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={addRecipesStyles.title}>Add from Recipes</Text>
+            <View style={{ width: 60 }} />
+          </View>
+
+          <View style={addRecipesStyles.searchBar}>
+            <Text style={addRecipesStyles.searchIcon}>🔍</Text>
+            <TextInput
+              style={addRecipesStyles.searchInput}
+              value={recipeSearch}
+              onChangeText={handleRecipeSearch}
+              placeholder="Search recipes to add…"
+              placeholderTextColor={colors.textDisabled}
+              autoFocus
+            />
+          </View>
+
+          {recipeSearching ? (
+            <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.lg }} />
+          ) : (
+            <FlatList
+              data={recipeResults}
+              keyExtractor={r => r.id}
+              contentContainerStyle={addRecipesStyles.resultsList}
+              ListEmptyComponent={
+                <Text style={addRecipesStyles.emptyText}>
+                  {recipeSearch.trim() ? 'No recipes found' : 'Search for recipes to add their ingredients'}
+                </Text>
+              }
+              renderItem={({ item }) => {
+                const selected = selectedRecipeIds.has(item.id);
+                return (
+                  <TouchableOpacity
+                    style={addRecipesStyles.resultItem}
+                    onPress={() => toggleRecipeSelected(item.id)}
+                  >
+                    <View style={[addRecipesStyles.checkbox, selected && addRecipesStyles.checkboxChecked]}>
+                      {selected && <Text style={addRecipesStyles.checkmark}>✓</Text>}
+                    </View>
+                    <Text style={addRecipesStyles.resultName} numberOfLines={1}>{item.name}</Text>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
+
+          <TouchableOpacity
+            style={[addRecipesStyles.confirmBtn, (selectedRecipeIds.size === 0 || addingRecipes) && { opacity: 0.5 }]}
+            onPress={handleAddSelectedRecipes}
+            disabled={selectedRecipeIds.size === 0 || addingRecipes}
+          >
+            {addingRecipes
+              ? <ActivityIndicator color={colors.textInverse} size="small" />
+              : <Text style={addRecipesStyles.confirmBtnText}>
+                  Add {selectedRecipeIds.size > 0 ? `${selectedRecipeIds.size} ` : ''}Recipe{selectedRecipeIds.size === 1 ? '' : 's'}
+                </Text>
+            }
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -296,4 +423,40 @@ const styles = StyleSheet.create({
   addSubmitText: { color: colors.textInverse, fontWeight: typography.weight.semibold, fontSize: typography.size.md },
   errorText: { color: colors.error, fontSize: typography.size.md },
   retryText: { color: colors.primary, fontSize: typography.size.md },
+});
+
+const addRecipesStyles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.md, paddingTop: spacing.xl, paddingBottom: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  cancel: { fontSize: typography.size.md, color: colors.textSecondary, width: 60 },
+  title: { fontSize: typography.size.lg, fontWeight: typography.weight.bold, color: colors.textPrimary },
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface,
+    borderRadius: radius.md, marginHorizontal: spacing.md, marginVertical: spacing.sm,
+    paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, gap: spacing.sm,
+  },
+  searchIcon: { fontSize: 16 },
+  searchInput: { flex: 1, paddingVertical: spacing.sm + 2, fontSize: typography.size.md, color: colors.textPrimary },
+  resultsList: { paddingHorizontal: spacing.md, paddingBottom: spacing.xxl },
+  resultItem: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  checkbox: {
+    width: 22, height: 22, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkmark: { fontSize: 14, color: colors.textInverse, fontWeight: typography.weight.bold },
+  resultName: { flex: 1, fontSize: typography.size.md, color: colors.textPrimary },
+  emptyText: { color: colors.textDisabled, textAlign: 'center', fontSize: typography.size.md, marginTop: spacing.xl },
+  confirmBtn: {
+    margin: spacing.md, backgroundColor: colors.primary, borderRadius: radius.md,
+    paddingVertical: spacing.md + 2, alignItems: 'center',
+  },
+  confirmBtnText: { color: colors.textInverse, fontSize: typography.size.lg, fontWeight: typography.weight.semibold },
 });

@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0F0D0A"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.voriseklabs.mealinego"
@@ -21,14 +23,28 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F0D0A"
       },
-      "package": "com.voriseklabs.mealinego",
-      "usesCleartextTraffic": true
+      "package": "com.voriseklabs.mealinego"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Mealie Go to access your photos to update recipe images.",
+          "cameraPermission": "Allow Mealie Go to use your camera to take recipe photos."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ]
   }
 }

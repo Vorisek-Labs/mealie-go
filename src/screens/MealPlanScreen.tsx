@@ -3,8 +3,10 @@ import {
   ActivityIndicator, Alert, FlatList, Modal, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useMealPlan } from '../hooks/useMealPlan';
 import { api } from '../lib/mealieApi';
+import { navigateToGuide } from '../navigation/navigateToGuide';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
 import type { MealPlanEntry, MealPlanEntryType, RecipeSummary } from '../types';
@@ -38,6 +40,7 @@ function isoDate(date: Date): string {
 type AddMode = 'recipe' | 'note';
 
 export default function MealPlanScreen() {
+  const navigation = useNavigation();
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(0);
 
@@ -137,14 +140,24 @@ export default function MealPlanScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setWeekOffset(w => w - 1)}>
-          <Text style={styles.navArrow}>‹</Text>
-        </TouchableOpacity>
-        <Text style={styles.weekLabel}>
-          {weekOffset === 0 ? 'This Week' : weekOffset === 1 ? 'Next Week' : weekOffset === -1 ? 'Last Week' : isoDate(weekStart)}
-        </Text>
-        <TouchableOpacity onPress={() => setWeekOffset(w => w + 1)}>
-          <Text style={styles.navArrow}>›</Text>
+        <View style={styles.headerSide} />
+        <View style={styles.weekNav}>
+          <TouchableOpacity onPress={() => setWeekOffset(w => w - 1)}>
+            <Text style={styles.navArrow}>‹</Text>
+          </TouchableOpacity>
+          <Text style={styles.weekLabel}>
+            {weekOffset === 0 ? 'This Week' : weekOffset === 1 ? 'Next Week' : weekOffset === -1 ? 'Last Week' : isoDate(weekStart)}
+          </Text>
+          <TouchableOpacity onPress={() => setWeekOffset(w => w + 1)}>
+            <Text style={styles.navArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity
+          style={styles.headerSide}
+          onPress={() => navigateToGuide(navigation, 'mealPlan')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.guideButtonText}>?</Text>
         </TouchableOpacity>
       </View>
 
@@ -314,7 +327,10 @@ export default function MealPlanScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingTop: 56 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  headerSide: { width: 28, alignItems: 'center' },
+  guideButtonText: { fontSize: typography.size.md, fontWeight: typography.weight.bold, color: colors.textDisabled },
+  weekNav: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   navArrow: { fontSize: 28, color: colors.textSecondary, paddingHorizontal: spacing.sm },
   weekLabel: { fontSize: typography.size.xl, fontWeight: typography.weight.bold, color: colors.textPrimary },
   dayStrip: { flexGrow: 0, borderBottomWidth: 1, borderBottomColor: colors.border },

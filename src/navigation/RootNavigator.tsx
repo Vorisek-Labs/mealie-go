@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
+import { getHasSeenWelcome } from '../lib/onboarding';
 import { colors } from '../theme';
+import type { GuideSection } from './navigateToGuide';
 
 import ConnectScreen from '../screens/auth/ConnectScreen';
 import RecipesScreen from '../screens/RecipesScreen';
@@ -17,9 +19,18 @@ import ShoppingListDetailScreen from '../screens/ShoppingListDetailScreen';
 import CookbooksScreen from '../screens/CookbooksScreen';
 import CookbookDetailScreen from '../screens/CookbookDetailScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import WelcomeScreen from '../screens/WelcomeScreen';
+import GuideScreen from '../screens/GuideScreen';
+import RecipeSuggestionsScreen from '../screens/RecipeSuggestionsScreen';
 
 export type AuthStackParams = {
   Connect: undefined;
+};
+
+export type RootStackParams = {
+  Welcome: undefined;
+  MainTabs: undefined;
+  Guide: { section?: GuideSection } | undefined;
 };
 
 export type RecipesStackParams = {
@@ -27,6 +38,7 @@ export type RecipesStackParams = {
   RecipeDetail: { slug: string; name: string };
   AddRecipe: undefined;
   RecipeEdit: { slug: string; name: string };
+  RecipeSuggestions: undefined;
 };
 
 export type ShoppingStackParams = {
@@ -48,6 +60,7 @@ export type MainTabParams = {
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParams>();
+const RootStack = createNativeStackNavigator<RootStackParams>();
 const RecipesStack = createNativeStackNavigator<RecipesStackParams>();
 const ShoppingStack = createNativeStackNavigator<ShoppingStackParams>();
 const CookbooksStack = createNativeStackNavigator<CookbooksStackParams>();
@@ -80,6 +93,7 @@ function RecipesNavigator() {
         options={{ presentation: 'modal' }}
       />
       <RecipesStack.Screen name="RecipeEdit" component={RecipeEditScreen} />
+      <RecipesStack.Screen name="RecipeSuggestions" component={RecipeSuggestionsScreen} />
     </RecipesStack.Navigator>
   );
 }
@@ -142,10 +156,23 @@ function AuthNavigator() {
   );
 }
 
-export default function RootNavigator() {
-  const { user, loading } = useAuth();
+function AuthedNavigator({ initialRouteName }: { initialRouteName: 'Welcome' | 'MainTabs' }) {
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRouteName}>
+      <RootStack.Screen name="Welcome" component={WelcomeScreen} />
+      <RootStack.Screen name="MainTabs" component={MainTabs} />
+      <RootStack.Screen name="Guide" component={GuideScreen} options={{ presentation: 'modal' }} />
+    </RootStack.Navigator>
+  );
+}
 
-  if (loading) {
+export default function RootNavigator() {
+  const { user, loading, justSignedIn } = useAuth();
+  const [hasSeenWelcome, setHasSeenWelcomeState] = useState<boolean | null>(null);
+
+  useEffect(() => { getHasSeenWelcome().then(setHasSeenWelcomeState); }, []);
+
+  if (loading || (user && hasSeenWelcome === null)) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={colors.primary} size="large" />
@@ -153,9 +180,17 @@ export default function RootNavigator() {
     );
   }
 
+  // Welcome only ever shows immediately after an explicit sign-in (never for
+  // a session auto-restored from a saved token), and only until it's been
+  // seen once, ever, on this device.
+  const showWelcome = justSignedIn && !hasSeenWelcome;
+
   return (
     <NavigationContainer>
-      {user ? <MainTabs /> : <AuthNavigator />}
+      {user
+        ? <AuthedNavigator initialRouteName={showWelcome ? 'Welcome' : 'MainTabs'} />
+        : <AuthNavigator />
+      }
     </NavigationContainer>
   );
 }

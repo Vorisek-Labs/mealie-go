@@ -2,7 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/mealieApi';
 import type { RecipeSummary } from '../types';
 
-export function useRecipes() {
+export interface RecipeFilters {
+  tags: string[];       // slugs
+  categories: string[]; // slugs
+  tools: string[];      // slugs
+  foods: string[];      // UUIDs (foods have no slug)
+}
+
+export const EMPTY_FILTERS: RecipeFilters = { tags: [], categories: [], tools: [], foods: [] };
+
+// Pass a cookbook slug to scope every fetch to that cookbook's recipes —
+// used by CookbookDetailScreen to get the same search/filter/pagination
+// behavior as the main Recipes list, just narrowed to one cookbook.
+export function useRecipes(cookbookSlug?: string) {
   const [recipes, setRecipes] = useState<RecipeSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -10,32 +22,32 @@ export function useRecipes() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [filterTags, setFilterTags] = useState<string[]>([]);
-  const [filterCategories, setFilterCategories] = useState<string[]>([]);
+  const [filters, setFilters] = useState<RecipeFilters>(EMPTY_FILTERS);
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRef = useRef('');
-  const filterTagsRef = useRef<string[]>([]);
-  const filterCatsRef = useRef<string[]>([]);
+  const filtersRef = useRef<RecipeFilters>(EMPTY_FILTERS);
 
   searchRef.current = search;
-  filterTagsRef.current = filterTags;
-  filterCatsRef.current = filterCategories;
+  filtersRef.current = filters;
 
   const fetchPage = useCallback(async (
     pageNum: number,
     searchTerm: string,
     replace: boolean,
-    tags?: string[],
-    cats?: string[],
+    overrideFilters?: RecipeFilters,
   ) => {
     try {
+      const f = overrideFilters ?? filtersRef.current;
       const data = await api.getRecipes({
         page: pageNum,
         perPage: 50,
         search: searchTerm || undefined,
-        tags: tags ?? filterTagsRef.current,
-        categories: cats ?? filterCatsRef.current,
+        tags: f.tags,
+        categories: f.categories,
+        tools: f.tools,
+        foods: f.foods,
+        cookbook: cookbookSlug,
       });
       setRecipes(prev => replace ? data.items : [...prev, ...data.items]);
       setHasMore(pageNum < data.total_pages);
@@ -43,7 +55,7 @@ export function useRecipes() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load recipes');
     }
-  }, []);
+  }, [cookbookSlug]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -75,23 +87,22 @@ export function useRecipes() {
     }, 400);
   }, [fetchPage]);
 
-  const applyFilters = useCallback(async (tags: string[], cats: string[]) => {
-    setFilterTags(tags);
-    setFilterCategories(cats);
-    filterTagsRef.current = tags;
-    filterCatsRef.current = cats;
+  const applyFilters = useCallback(async (next: RecipeFilters) => {
+    setFilters(next);
+    filtersRef.current = next;
     setLoading(true);
     setError(null);
-    await fetchPage(1, searchRef.current, true, tags, cats);
+    await fetchPage(1, searchRef.current, true, next);
     setLoading(false);
   }, [fetchPage]);
 
-  const activeFilterCount = filterTags.length + filterCategories.length;
+  const activeFilterCount =
+    filters.tags.length + filters.categories.length + filters.tools.length + filters.foods.length;
 
   return {
     recipes, loading, loadingMore, error,
     search, setSearch: handleSearch,
     refresh, loadMore, hasMore,
-    filterTags, filterCategories, applyFilters, activeFilterCount,
+    filters, applyFilters, activeFilterCount,
   };
 }

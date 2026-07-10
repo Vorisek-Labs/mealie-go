@@ -1,14 +1,24 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Image, Linking, ScrollView, Share,
+  ActivityIndicator, Alert, Image, Linking, Modal, ScrollView, Share,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
-import { api, recipeAssetUrl, recipeImageUrl } from '../lib/mealieApi';
+import { useFavorites } from '../context/FavoritesContext';
+import { api, recipeAssetUrl, recipeImageSource } from '../lib/mealieApi';
+import {
+  convertToMetric, convertInstructionTemperatures,
+  getUnitSystemPreference, setUnitSystemPreference,
+} from '../lib/unitConversion';
+import type { UnitSystemPreference } from '../lib/unitConversion';
 import { colors, radius, spacing, typography } from '../theme';
-import type { Recipe, RecipeComment } from '../types';
+import type { Recipe, RecipeComment, RecipeShareToken, ShoppingList } from '../types';
 import type { RecipesStackParams } from '../navigation/RootNavigator';
 
 type Props = {
@@ -43,14 +53,73 @@ function formatQty(qty: number): string {
   return parseFloat(qty.toFixed(2)).toString();
 }
 
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function buildRecipePdfHtml(recipe: Recipe, imageTag: string): string {
+  const ingredients = recipe.recipeIngredient
+    .map(ing => `<li>${escapeHtml(ing.display ?? ing.originalText ?? '')}</li>`)
+    .join('');
+  const steps = recipe.recipeInstructions
+    .map((step, i) => `<li><strong>${i + 1}.</strong> ${step.title ? `<strong>${escapeHtml(step.title)}</strong> — ` : ''}${escapeHtml(step.text)}</li>`)
+    .join('');
+  const notes = recipe.notes
+    .map(n => `<div class="note">${n.title ? `<strong>${escapeHtml(n.title)}</strong><br/>` : ''}${escapeHtml(n.text)}</div>`)
+    .join('');
+  const meta = [
+    recipe.prepTime ? `Prep: ${escapeHtml(recipe.prepTime)}` : '',
+    recipe.cookTime ? `Cook: ${escapeHtml(recipe.cookTime)}` : '',
+    recipe.totalTime ? `Total: ${escapeHtml(recipe.totalTime)}` : '',
+    recipe.recipeYield ? `Serves: ${escapeHtml(recipe.recipeYield)}` : '',
+  ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+
+  return `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #1a1a1a; padding: 24px; }
+          h1 { font-size: 24px; margin-bottom: 4px; }
+          .meta { color: #555; font-size: 13px; margin-bottom: 16px; }
+          .description { margin-bottom: 16px; }
+          h2 { font-size: 16px; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-top: 24px; }
+          li { margin-bottom: 6px; line-height: 1.4; }
+          .note { background: #f5f5f5; padding: 10px; border-radius: 6px; margin-bottom: 8px; }
+        </style>
+      </head>
+      <body>
+        ${imageTag}
+        <h1>${escapeHtml(recipe.name ?? '')}</h1>
+        ${meta ? `<div class="meta">${meta}</div>` : ''}
+        ${recipe.description ? `<div class="description">${escapeHtml(recipe.description)}</div>` : ''}
+        ${ingredients ? `<h2>Ingredients</h2><ul>${ingredients}</ul>` : ''}
+        ${steps ? `<h2>Instructions</h2><ol style="list-style:none;padding-left:0;">${steps}</ol>` : ''}
+        ${notes ? `<h2>Notes</h2>${notes}` : ''}
+      </body>
+    </html>
+  `;
+}
+
 export default function RecipeDetailScreen({ navigation, route }: Props) {
   const { slug, name } = route.params;
-  const { serverUrl } = useAuth();
+  const { serverUrl, token, user } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('ingredients');
   const [imgError, setImgError] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
+  const [unitSystem, setUnitSystem] = useState<UnitSystemPreference>('original');
 
   const [servings, setServings] = useState(1);
   const [originalServings, setOriginalServings] = useState(1);
@@ -61,6 +130,17 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
   const [commentSending, setCommentSending] = useState(false);
 
   const [rating, setRating] = useState(0);
+
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareTokens, setShareTokens] = useState<RecipeShareToken[]>([]);
+  const [shareTokensLoading, setShareTokensLoading] = useState(false);
+  const [creatingToken, setCreatingToken] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const [showListPicker, setShowListPicker] = useState(false);
+  const [shoppingLists, setShoppingLists] = useState<ShoppingList[]>([]);
+  const [listPickerLoading, setListPickerLoading] = useState(false);
+  const [addingToListId, setAddingToListId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,6 +160,14 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
   }, [slug]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => { getUnitSystemPreference().then(setUnitSystem); }, []);
+
+  const toggleUnitSystem = async () => {
+    const next = unitSystem === 'metric' ? 'original' : 'metric';
+    setUnitSystem(next);
+    await setUnitSystemPreference(next);
+  };
 
   const loadComments = useCallback(async () => {
     if (!recipe) return;
@@ -141,14 +229,174 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
     ]);
   };
 
-  const handleShare = async () => {
+  const loadShareTokens = useCallback(async () => {
     if (!recipe) return;
+    setShareTokensLoading(true);
+    try {
+      setShareTokens(await api.getShareTokens(recipe.id));
+    } catch {
+      setShareTokens([]);
+    } finally {
+      setShareTokensLoading(false);
+    }
+  }, [recipe]);
+
+  const openShareModal = () => {
+    setShowShareModal(true);
+    loadShareTokens();
+  };
+
+  const shareTokenLink = (tokenId: string) =>
+    `${serverUrl}/g/${user?.groupSlug ?? 'home'}/shared/r/${tokenId}`;
+
+  const handleCreateShareToken = async () => {
+    if (!recipe) return;
+    setCreatingToken(true);
+    try {
+      const created = await api.createShareToken(recipe.id);
+      setShareTokens(prev => [...prev, created]);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not create share link');
+    } finally {
+      setCreatingToken(false);
+    }
+  };
+
+  const handleShareToken = async (tokenId: string) => {
     try {
       await Share.share({
-        title: recipe.name,
-        message: `${recipe.name} — ${serverUrl}/g/home/r/${recipe.slug}`,
+        title: recipe?.name,
+        message: `${recipe?.name} — ${shareTokenLink(tokenId)}`,
       });
     } catch {}
+  };
+
+  const handleDeleteShareToken = async (tokenId: string) => {
+    try {
+      await api.deleteShareToken(tokenId);
+      setShareTokens(prev => prev.filter(t => t.id !== tokenId));
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not remove share link');
+    }
+  };
+
+  const handlePickImage = () => {
+    Alert.alert('Recipe Photo', 'Update this recipe\'s photo', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Take Photo', onPress: () => pickImage('camera') },
+      { text: 'Choose from Library', onPress: () => pickImage('library') },
+    ]);
+  };
+
+  const pickImage = async (source: 'camera' | 'library') => {
+    if (!recipe) return;
+    const permission = source === 'camera'
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', `Allow access to your ${source === 'camera' ? 'camera' : 'photos'} to update this image.`);
+      return;
+    }
+
+    const result = source === 'camera'
+      ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
+      : await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    setImageUploading(true);
+    try {
+      const { image } = await api.updateRecipeImage(slug, result.assets[0].uri);
+      setRecipe(prev => prev ? { ...prev, image } : prev);
+      setImgError(false);
+    } catch (e) {
+      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Could not update the recipe photo');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleAddAttachment = async () => {
+    if (!recipe) return;
+    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const picked = result.assets[0];
+    const baseName = picked.name.replace(/\.[^./\\]+$/, '') || 'attachment';
+
+    setAttachmentUploading(true);
+    try {
+      const asset = await api.uploadRecipeAsset(slug, picked.uri, baseName);
+      setRecipe(prev => prev ? { ...prev, assets: [...prev.assets, asset] } : prev);
+    } catch (e) {
+      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Could not add attachment');
+    } finally {
+      setAttachmentUploading(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!recipe) return;
+    setExportingPdf(true);
+    try {
+      let imageTag = '';
+      if (recipe.image) {
+        try {
+          const res = await fetch(recipeImageSource(serverUrl, token, recipe.id, recipe.image).uri, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const blob = await res.blob();
+          const dataUri: string = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          imageTag = `<img src="${dataUri}" style="width:100%;max-height:320px;object-fit:cover;border-radius:8px;margin-bottom:16px;" />`;
+        } catch {
+          // Image is a nice-to-have in the export — proceed without it if it fails to load.
+        }
+      }
+
+      const html = buildRecipePdfHtml(recipe, imageTag);
+      const { uri } = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+      } else {
+        Alert.alert('Exported', `PDF saved to ${uri}`);
+      }
+    } catch (e) {
+      Alert.alert('Export failed', e instanceof Error ? e.message : 'Could not export this recipe');
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  const openListPicker = async () => {
+    if (!recipe) return;
+    setShowListPicker(true);
+    setListPickerLoading(true);
+    try {
+      const data = await api.getShoppingLists();
+      setShoppingLists(data.items);
+    } catch {
+      setShoppingLists([]);
+    } finally {
+      setListPickerLoading(false);
+    }
+  };
+
+  const handleAddToList = async (list: ShoppingList) => {
+    if (!recipe) return;
+    setAddingToListId(list.id);
+    try {
+      await api.addRecipesToShoppingList(list.id, [recipe.id]);
+      setShowListPicker(false);
+      Alert.alert('Added', `Added ingredients to "${list.name}".`);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not add to that list');
+    } finally {
+      setAddingToListId(null);
+    }
   };
 
   const handleDelete = () => {
@@ -170,7 +418,8 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
   };
 
   const openAsset = (fileName: string) => {
-    Linking.openURL(recipeAssetUrl(serverUrl, slug, fileName)).catch(() =>
+    if (!recipe) return;
+    Linking.openURL(recipeAssetUrl(serverUrl, recipe.id, fileName)).catch(() =>
       Alert.alert('Cannot open', 'Could not open this file.')
     );
   };
@@ -196,8 +445,9 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
 
   const scale = servings / (originalServings || 1);
   const imgSrc = recipe.image && serverUrl && !imgError
-    ? { uri: recipeImageUrl(serverUrl, recipe.slug) }
+    ? recipeImageSource(serverUrl, token, recipe.id, recipe.image)
     : null;
+  const favorite = isFavorite(recipe.id);
 
   const TABS: { key: ActiveTab; label: string }[] = [
     { key: 'ingredients', label: 'Ingredients' },
@@ -224,19 +474,42 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
           </View>
         )}
 
+        {imageUploading && (
+          <View style={styles.heroUploadOverlay}>
+            <ActivityIndicator color="#fff" size="large" />
+          </View>
+        )}
+
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>‹</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.cameraButton}
+          onPress={handlePickImage}
+          disabled={imageUploading}
+        >
+          <Text style={styles.cameraButtonText}>📷</Text>
+        </TouchableOpacity>
+
         <View style={styles.overlayActions}>
+          <TouchableOpacity style={styles.overlayBtn} onPress={() => toggleFavorite(recipe.id, slug)}>
+            <Text style={styles.overlayBtnText}>{favorite ? '♥ Saved' : '♡ Favorite'}</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.overlayBtn}
             onPress={() => navigation.navigate('RecipeEdit', { slug, name: recipe.name })}
           >
             <Text style={styles.overlayBtnText}>Edit</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.overlayBtn} onPress={handleShare}>
+          <TouchableOpacity style={styles.overlayBtn} onPress={openShareModal}>
             <Text style={styles.overlayBtnText}>Share</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.overlayBtn} onPress={handleExportPdf} disabled={exportingPdf}>
+            {exportingPdf
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={styles.overlayBtnText}>PDF</Text>
+            }
           </TouchableOpacity>
         </View>
 
@@ -289,24 +562,34 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
 
           {activeTab === 'ingredients' && (
             <View style={styles.section}>
-              {originalServings > 1 && (
-                <View style={styles.scaler}>
-                  <Text style={styles.scalerLabel}>Servings:</Text>
-                  <TouchableOpacity
-                    style={styles.scalerBtn}
-                    onPress={() => setServings(s => Math.max(1, s - 1))}
-                  >
-                    <Text style={styles.scalerBtnText}>−</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.scalerValue}>{servings}</Text>
-                  <TouchableOpacity
-                    style={styles.scalerBtn}
-                    onPress={() => setServings(s => s + 1)}
-                  >
-                    <Text style={styles.scalerBtnText}>+</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+              <View style={styles.ingredientToolbar}>
+                {originalServings > 1 && (
+                  <View style={styles.scaler}>
+                    <Text style={styles.scalerLabel}>Servings:</Text>
+                    <TouchableOpacity
+                      style={styles.scalerBtn}
+                      onPress={() => setServings(s => Math.max(1, s - 1))}
+                    >
+                      <Text style={styles.scalerBtnText}>−</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.scalerValue}>{servings}</Text>
+                    <TouchableOpacity
+                      style={styles.scalerBtn}
+                      onPress={() => setServings(s => s + 1)}
+                    >
+                      <Text style={styles.scalerBtnText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                <TouchableOpacity style={styles.unitToggle} onPress={toggleUnitSystem}>
+                  <Text style={styles.unitToggleText}>
+                    {unitSystem === 'metric' ? 'Metric' : 'Original units'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={styles.addToListBtn} onPress={openListPicker}>
+                <Text style={styles.addToListBtnText}>🛒 Add Ingredients to Shopping List</Text>
+              </TouchableOpacity>
               {recipe.recipeIngredient.length === 0 ? (
                 <Text style={styles.emptyText}>No ingredients listed</Text>
               ) : recipe.recipeIngredient.map((ing, i) => {
@@ -317,9 +600,24 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
                   ing.food?.name ?? '',
                   ing.note ? `(${ing.note})` : '',
                 ].filter(Boolean).join(' ');
-                const displayText = scaledQty && ing.quantity
+                let displayText = scaledQty && ing.quantity
                   ? base.replace(String(ing.quantity), scaledQty)
                   : base;
+
+                if (unitSystem === 'metric' && ing.quantity) {
+                  const effectiveQty = scaledQty ? parseFloat(scaledQty) : ing.quantity;
+                  const converted = convertToMetric(effectiveQty, ing.unit);
+                  if (converted) {
+                    const qtyToken = scaledQty ?? String(ing.quantity);
+                    displayText = displayText.replace(qtyToken, formatQty(converted.quantity));
+                    const unitWord = ing.unit?.abbreviation || ing.unit?.name;
+                    if (unitWord) {
+                      const re = new RegExp(`\\b${escapeRegex(unitWord)}\\b`, 'i');
+                      displayText = displayText.replace(re, converted.unitLabel);
+                    }
+                  }
+                }
+
                 return (
                   <View key={i} style={styles.ingredient}>
                     <View style={styles.bullet} />
@@ -341,7 +639,9 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
                   </View>
                   <View style={styles.stepContent}>
                     {step.title ? <Text style={styles.stepTitle}>{step.title}</Text> : null}
-                    <Text style={styles.stepText}>{step.text}</Text>
+                    <Text style={styles.stepText}>
+                      {unitSystem === 'metric' ? convertInstructionTemperatures(step.text) : step.text}
+                    </Text>
                   </View>
                 </View>
               ))}
@@ -407,28 +707,127 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
             </View>
           )}
 
-          {recipe.assets && recipe.assets.length > 0 && (
-            <View style={styles.assetsSection}>
+          <View style={styles.assetsSection}>
+            <View style={styles.assetsSectionHeader}>
               <Text style={styles.assetsSectionTitle}>ATTACHMENTS</Text>
-              {recipe.assets.map((asset, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={styles.assetItem}
-                  onPress={() => openAsset(asset.fileName)}
-                >
-                  <Text style={styles.assetIcon}>📎</Text>
-                  <Text style={styles.assetName} numberOfLines={1}>{asset.name || asset.fileName}</Text>
-                  <Text style={styles.assetOpen}>Open ›</Text>
-                </TouchableOpacity>
-              ))}
+              <TouchableOpacity onPress={handleAddAttachment} disabled={attachmentUploading}>
+                {attachmentUploading
+                  ? <ActivityIndicator color={colors.primary} size="small" />
+                  : <Text style={styles.assetAddText}>+ Add</Text>
+                }
+              </TouchableOpacity>
             </View>
-          )}
+            {recipe.assets && recipe.assets.length > 0 ? recipe.assets.map((asset, i) => (
+              <TouchableOpacity
+                key={i}
+                style={styles.assetItem}
+                onPress={() => openAsset(asset.fileName)}
+              >
+                <Text style={styles.assetIcon}>📎</Text>
+                <Text style={styles.assetName} numberOfLines={1}>{asset.name || asset.fileName}</Text>
+                <Text style={styles.assetOpen}>Open ›</Text>
+              </TouchableOpacity>
+            )) : (
+              <Text style={styles.emptyText}>No attachments yet</Text>
+            )}
+          </View>
 
           <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
             <Text style={styles.deleteButtonText}>Delete Recipe</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={showShareModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowShareModal(false)}
+      >
+        <View style={shareStyles.container}>
+          <View style={shareStyles.header}>
+            <TouchableOpacity onPress={() => setShowShareModal(false)}>
+              <Text style={shareStyles.close}>Close</Text>
+            </TouchableOpacity>
+            <Text style={shareStyles.title}>Share Recipe</Text>
+            <View style={{ width: 50 }} />
+          </View>
+
+          <TouchableOpacity
+            style={shareStyles.newLinkBtn}
+            onPress={handleCreateShareToken}
+            disabled={creatingToken}
+          >
+            {creatingToken
+              ? <ActivityIndicator color={colors.textInverse} size="small" />
+              : <Text style={shareStyles.newLinkBtnText}>+ New Share Link</Text>
+            }
+          </TouchableOpacity>
+
+          {shareTokensLoading ? (
+            <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+          ) : shareTokens.length === 0 ? (
+            <Text style={styles.emptyText}>No share links yet — friends without an account can view this recipe with one.</Text>
+          ) : (
+            <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.sm }}>
+              {shareTokens.map(t => (
+                <View key={t.id} style={shareStyles.tokenRow}>
+                  <TouchableOpacity style={{ flex: 1 }} onPress={() => handleShareToken(t.id)}>
+                    <Text style={shareStyles.tokenExpiry}>
+                      Expires {new Date(t.expiresAt).toLocaleDateString()}
+                    </Text>
+                    <Text style={shareStyles.tokenLink} numberOfLines={1}>{shareTokenLink(t.id)}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleShareToken(t.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={shareStyles.tokenAction}>Share</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDeleteShareToken(t.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={[shareStyles.tokenAction, { color: colors.error }]}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showListPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowListPicker(false)}
+      >
+        <View style={listPickerStyles.overlay}>
+          <View style={listPickerStyles.content}>
+            <Text style={listPickerStyles.title}>Add to Shopping List</Text>
+            {listPickerLoading ? (
+              <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
+            ) : shoppingLists.length === 0 ? (
+              <Text style={styles.emptyText}>No shopping lists yet — create one in the Shopping tab first.</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 300 }}>
+                {shoppingLists.map(list => (
+                  <TouchableOpacity
+                    key={list.id}
+                    style={listPickerStyles.listRow}
+                    onPress={() => handleAddToList(list)}
+                    disabled={addingToListId !== null}
+                  >
+                    <Text style={listPickerStyles.listName}>{list.name}</Text>
+                    {addingToListId === list.id
+                      ? <ActivityIndicator color={colors.primary} size="small" />
+                      : <Text style={listPickerStyles.chevron}>›</Text>
+                    }
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+            <TouchableOpacity style={listPickerStyles.cancelBtn} onPress={() => setShowListPicker(false)}>
+              <Text style={listPickerStyles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -477,6 +876,10 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   heroPlaceholderIcon: { fontSize: 64 },
+  heroUploadOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 260,
+    backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center',
+  },
   backButton: {
     position: 'absolute', top: 52, left: spacing.md,
     width: 36, height: 36, borderRadius: radius.full,
@@ -484,9 +887,16 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   backButtonText: { fontSize: 24, color: '#fff', lineHeight: 30 },
-  overlayActions: {
+  cameraButton: {
     position: 'absolute', top: 52, right: spacing.md,
-    flexDirection: 'row', gap: spacing.xs,
+    width: 36, height: 36, borderRadius: radius.full,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  cameraButtonText: { fontSize: 16 },
+  overlayActions: {
+    position: 'absolute', bottom: spacing.md, right: spacing.md, left: spacing.md,
+    flexDirection: 'row', gap: spacing.xs, justifyContent: 'flex-end', flexWrap: 'wrap',
   },
   overlayBtn: {
     paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
@@ -509,6 +919,19 @@ const styles = StyleSheet.create({
     color: colors.textDisabled, textTransform: 'uppercase', letterSpacing: 0.8,
   },
   nutritionGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  ingredientToolbar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm,
+  },
+  unitToggle: {
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
+  },
+  unitToggleText: { fontSize: typography.size.xs, fontWeight: typography.weight.medium, color: colors.primary },
+  addToListBtn: {
+    borderWidth: 1, borderColor: colors.borderLight, borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2, alignItems: 'center', backgroundColor: colors.surface,
+  },
+  addToListBtnText: { fontSize: typography.size.sm, fontWeight: typography.weight.medium, color: colors.primary },
   scaler: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
     backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.sm,
@@ -566,10 +989,12 @@ const styles = StyleSheet.create({
   commentDate: { fontSize: typography.size.xs, color: colors.textDisabled },
   commentText: { fontSize: typography.size.md, color: colors.textPrimary, lineHeight: typography.size.md * 1.5 },
   assetsSection: { gap: spacing.sm, marginTop: spacing.sm },
+  assetsSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   assetsSectionTitle: {
     fontSize: typography.size.xs, fontWeight: typography.weight.semibold,
     color: colors.textDisabled, textTransform: 'uppercase', letterSpacing: 0.8,
   },
+  assetAddText: { fontSize: typography.size.sm, fontWeight: typography.weight.medium, color: colors.primary },
   assetItem: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     backgroundColor: colors.surface, borderRadius: radius.md,
@@ -582,4 +1007,48 @@ const styles = StyleSheet.create({
   deleteButtonText: { color: colors.error, fontSize: typography.size.md, fontWeight: typography.weight.medium },
   errorText: { color: colors.error, fontSize: typography.size.md },
   retryText: { color: colors.primary, fontSize: typography.size.md },
+});
+
+const shareStyles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.md, paddingTop: spacing.xl, paddingBottom: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  close: { fontSize: typography.size.md, color: colors.textSecondary, width: 50 },
+  title: { fontSize: typography.size.xl, fontWeight: typography.weight.bold, color: colors.textPrimary },
+  newLinkBtn: {
+    margin: spacing.md, backgroundColor: colors.primary, borderRadius: radius.md,
+    paddingVertical: spacing.md, alignItems: 'center',
+  },
+  newLinkBtnText: { color: colors.textInverse, fontWeight: typography.weight.semibold, fontSize: typography.size.md },
+  tokenRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.surface, borderRadius: radius.md,
+    padding: spacing.md, borderWidth: 1, borderColor: colors.border,
+  },
+  tokenExpiry: { fontSize: typography.size.xs, color: colors.textDisabled },
+  tokenLink: { fontSize: typography.size.sm, color: colors.textPrimary, marginTop: 2 },
+  tokenAction: { fontSize: typography.size.sm, color: colors.primary, fontWeight: typography.weight.medium },
+});
+
+const listPickerStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+  content: {
+    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg,
+    width: '85%', gap: spacing.md, borderWidth: 1, borderColor: colors.border,
+  },
+  title: { fontSize: typography.size.xl, fontWeight: typography.weight.bold, color: colors.textPrimary },
+  listRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  listName: { fontSize: typography.size.md, color: colors.textPrimary },
+  chevron: { fontSize: 20, color: colors.textDisabled },
+  cancelBtn: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+    paddingVertical: spacing.md, alignItems: 'center',
+  },
+  cancelBtnText: { color: colors.textSecondary, fontSize: typography.size.md },
 });

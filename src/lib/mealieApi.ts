@@ -5,7 +5,8 @@ import type {
   UserProfile, PaginatedResponse, RecipeSummary, Recipe,
   MealPlanEntry, CreateMealPlanEntry,
   ShoppingList, ShoppingListWithItems, ShoppingListItem,
-  Cookbook, RecipeTag, RecipeCategory, RecipeComment, ShoppingLabel,
+  Cookbook, CookbookInput, RecipeTag, RecipeCategory, RecipeTool, RecipeFood, RecipeComment, ShoppingLabel,
+  UserRatingSummary, RecipeShareToken, RecipeSuggestion,
 } from '../types';
 
 const SERVER_URL_KEY = 'mealie_go.server_url';
@@ -72,6 +73,71 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// Multipart uploads must NOT set a Content-Type header — fetch derives the
+// multipart/form-data boundary itself from the FormData body.
+async function requestMultipart<T>(path: string, method: string, form: FormData): Promise<T> {
+  const [serverUrl, token] = await Promise.all([getServerUrl(), getToken()]);
+  const res = await fetch(`${serverUrl}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (res.status === 401) throw new Error('UNAUTHORIZED');
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`${res.status}: ${text}`);
+  }
+  if (res.status === 204) return undefined as unknown as T;
+  return res.json() as Promise<T>;
+}
+
+function extensionFromUri(uri: string): string {
+  const match = /\.([a-zA-Z0-9]+)$/.exec(uri.split('?')[0]);
+  return (match?.[1] ?? 'jpg').toLowerCase();
+}
+
+function mimeTypeForExtension(ext: string): string {
+  const known: Record<string, string> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+    webp: 'image/webp', bmp: 'image/bmp', avif: 'image/avif',
+    pdf: 'application/pdf', txt: 'text/plain', md: 'text/markdown',
+    csv: 'text/csv', json: 'application/json',
+  };
+  return known[ext] ?? 'application/octet-stream';
+}
+
+export function assetIconForExtension(ext: string): string {
+  if (ext === 'pdf') return 'mdi-file-pdf-box';
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif'].includes(ext)) return 'mdi-file-image';
+  if (ext === 'json') return 'mdi-code-json';
+  return 'mdi-file';
+}
+
+export interface RecipeQueryParams {
+  page?: number; perPage?: number; search?: string;
+  tags?: string[]; categories?: string[]; tools?: string[]; foods?: string[];
+  // Recipes within a single cookbook — combines with the filters above in the
+  // same request (confirmed against Mealie's recipe list route).
+  cookbook?: string;
+}
+
+function buildRecipeQuery(params?: RecipeQueryParams): URLSearchParams {
+  const q = new URLSearchParams({
+    page: String(params?.page ?? 1),
+    perPage: String(params?.perPage ?? 50),
+    orderBy: 'name',
+    orderDirection: 'asc',
+  });
+  if (params?.search) q.set('search', params.search);
+  if (params?.cookbook) q.set('cookbook', params.cookbook);
+  if (params?.tags?.length) params.tags.forEach(t => q.append('tags', t));
+  if (params?.categories?.length) params.categories.forEach(c => q.append('categories', c));
+  if (params?.tools?.length) params.tools.forEach(t => q.append('tools', t));
+  // foods must be UUIDs (foods have no slug)
+  if (params?.foods?.length) params.foods.forEach(f => q.append('foods', f));
+  return q;
+}
+
 export async function login(serverUrl: string, username: string, password: string): Promise<string> {
   const base = serverUrl.replace(/\/$/, '');
   const body = new URLSearchParams({ username, password, remember_me: 'false' });
@@ -88,38 +154,65 @@ export async function login(serverUrl: string, username: string, password: strin
   return data.access_token as string;
 }
 
-export function recipeImageUrl(serverUrl: string, slug: string): string {
-  return `${serverUrl}/api/media/recipes/${slug}/images/original.webp`;
+// Media endpoints take the recipe UUID (recipe.id), NOT the slug —
+// passing a slug returns a 422 UUID-parse error from the server.
+// `version` busts the RN Image cache after a new image is uploaded.
+export function recipeImageUrl(serverUrl: string, recipeId: string, version?: string): string {
+  const base = `${serverUrl}/api/media/recipes/${recipeId}/images/original.webp`;
+  return version ? `${base}?v=${encodeURIComponent(version)}` : base;
 }
 
-export function recipeImageSource(serverUrl: string, token: string, slug: string) {
+export function recipeImageSource(serverUrl: string, token: string, recipeId: string, version?: string) {
   return {
-    uri: recipeImageUrl(serverUrl, slug),
+    uri: recipeImageUrl(serverUrl, recipeId, version),
     headers: { Authorization: `Bearer ${token}` },
   };
 }
 
-export function recipeAssetUrl(serverUrl: string, slug: string, fileName: string): string {
-  return `${serverUrl}/api/media/recipes/${slug}/assets/${encodeURIComponent(fileName)}`;
+export function recipeAssetUrl(serverUrl: string, recipeId: string, fileName: string): string {
+  return `${serverUrl}/api/media/recipes/${recipeId}/assets/${encodeURIComponent(fileName)}`;
 }
 
 export const api = {
   getSelf: () =>
     request<UserProfile>('/api/users/self'),
 
+  // Refresh a still-valid JWT for a new one with a fresh expiry.
+  // Only works while the current token is still valid — an already-expired
+  // token can't be refreshed (the server must decode it to issue a new one).
+  refreshToken: () =>
+    request<{ access_token: string }>('/api/auth/refresh'),
+
+  // Favorites & ratings (per-user; distinct from the recipe's own aggregate rating)
+  getFavoriteRecipeIds: (userId: string) =>
+    request<{ ratings: UserRatingSummary[] }>(`/api/users/${userId}/favorites`)
+      .then(r => new Set(r.ratings.map(x => x.recipeId))),
+
+  addFavorite: (userId: string, slug: string) =>
+    request<void>(`/api/users/${userId}/favorites/${slug}`, { method: 'POST' }),
+
+  removeFavorite: (userId: string, slug: string) =>
+    request<void>(`/api/users/${userId}/favorites/${slug}`, { method: 'DELETE' }),
+
+  // Recipe share tokens (public links)
+  getShareTokens: (recipeId: string) =>
+    request<RecipeShareToken[]>(`/api/shared/recipes?recipe_id=${recipeId}`),
+
+  createShareToken: (recipeId: string, expiresAt?: string) =>
+    request<RecipeShareToken>('/api/shared/recipes', {
+      method: 'POST',
+      body: JSON.stringify({
+        recipeId,
+        expiresAt: expiresAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      }),
+    }),
+
+  deleteShareToken: (id: string) =>
+    request<void>(`/api/shared/recipes/${id}`, { method: 'DELETE' }),
+
   // Recipes
-  getRecipes: (params?: { page?: number; perPage?: number; search?: string; tags?: string[]; categories?: string[] }) => {
-    const q = new URLSearchParams({
-      page: String(params?.page ?? 1),
-      perPage: String(params?.perPage ?? 50),
-      orderBy: 'name',
-      orderDirection: 'asc',
-    });
-    if (params?.search) q.set('search', params.search);
-    if (params?.tags?.length) params.tags.forEach(t => q.append('tags', t));
-    if (params?.categories?.length) params.categories.forEach(c => q.append('categories', c));
-    return request<PaginatedResponse<RecipeSummary>>(`/api/recipes?${q}`);
-  },
+  getRecipes: (params?: RecipeQueryParams) =>
+    request<PaginatedResponse<RecipeSummary>>(`/api/recipes?${buildRecipeQuery(params)}`),
 
   getRecipe: (slug: string) =>
     request<Recipe>(`/api/recipes/${slug}`),
@@ -144,6 +237,36 @@ export const api = {
 
   deleteRecipe: (slug: string) =>
     request<void>(`/api/recipes/${slug}`, { method: 'DELETE' }),
+
+  // Recipe image (multipart) — returns { image: <newVersion> }
+  updateRecipeImage: (slug: string, fileUri: string) => {
+    const extension = extensionFromUri(fileUri);
+    const form = new FormData();
+    form.append('image', {
+      uri: fileUri,
+      name: `image.${extension}`,
+      type: mimeTypeForExtension(extension),
+    } as unknown as Blob);
+    form.append('extension', extension);
+    return requestMultipart<{ image: string }>(`/api/recipes/${slug}/image`, 'PUT', form);
+  },
+
+  // Recipe attachment (multipart)
+  uploadRecipeAsset: (slug: string, fileUri: string, name: string) => {
+    const extension = extensionFromUri(fileUri);
+    const form = new FormData();
+    form.append('file', {
+      uri: fileUri,
+      name: `${name}.${extension}`,
+      type: mimeTypeForExtension(extension),
+    } as unknown as Blob);
+    form.append('name', name);
+    form.append('icon', assetIconForExtension(extension));
+    form.append('extension', extension);
+    return requestMultipart<{ name: string; icon: string; fileName: string }>(
+      `/api/recipes/${slug}/assets`, 'POST', form
+    );
+  },
 
   // Meal plans
   getMealPlans: (startDate?: string, endDate?: string) => {
@@ -207,10 +330,20 @@ export const api = {
   getCookbooks: () =>
     request<PaginatedResponse<Cookbook>>('/api/households/cookbooks?perPage=50'),
 
-  getCookbookRecipes: (slug: string, page = 1) =>
-    request<PaginatedResponse<RecipeSummary>>(
-      `/api/recipes?cookbook=${slug}&page=${page}&perPage=50&orderBy=name&orderDirection=asc`
-    ),
+  createCookbook: (data: CookbookInput) =>
+    request<Cookbook>('/api/households/cookbooks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCookbook: (id: string, data: CookbookInput) =>
+    request<Cookbook>(`/api/households/cookbooks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCookbook: (id: string) =>
+    request<void>(`/api/households/cookbooks/${id}`, { method: 'DELETE' }),
 
   // Organizers (tags, categories)
   getTags: () =>
@@ -218,6 +351,12 @@ export const api = {
 
   getCategories: () =>
     request<PaginatedResponse<RecipeCategory>>('/api/organizers/categories?perPage=200'),
+
+  getTools: () =>
+    request<PaginatedResponse<RecipeTool>>('/api/organizers/tools?perPage=200'),
+
+  getFoods: () =>
+    request<PaginatedResponse<RecipeFood>>('/api/foods?perPage=1000&orderBy=name&orderDirection=asc'),
 
   // Comments
   getComments: (slug: string) =>
@@ -236,19 +375,31 @@ export const api = {
   getShoppingLabels: () =>
     request<PaginatedResponse<ShoppingLabel>>('/api/households/shopping/labels?perPage=100'),
 
-  // Add a recipe's ingredients to a shopping list
-  addRecipeToShoppingList: (listId: string, recipeId: string) =>
-    request<void>(`/api/households/shopping/lists/${listId}/recipe`, {
+  // Add one or more recipes' ingredients to a shopping list in a single request.
+  // The endpoint takes a JSON array even for one recipe — omitting
+  // recipeIngredients lets the server pull each recipe's full ingredient list itself.
+  addRecipesToShoppingList: (listId: string, recipeIds: string[]) =>
+    request<ShoppingListWithItems>(`/api/households/shopping/lists/${listId}/recipe`, {
       method: 'POST',
-      body: JSON.stringify({ recipeId }),
+      body: JSON.stringify(recipeIds.map(recipeId => ({ recipeId, recipeIncrementQuantity: 1 }))),
     }),
 
-  // Get a random recipe (two requests: first to get total pages, second to fetch random page)
-  getRandomRecipe: async (): Promise<RecipeSummary | null> => {
-    const first = await request<PaginatedResponse<RecipeSummary>>('/api/recipes?page=1&perPage=1&orderBy=name&orderDirection=asc');
+  // "What can I make?" — suggests recipes from foods/tools you have on hand.
+  getRecipeSuggestions: (params: { foods?: string[]; tools?: string[]; limit?: number }) => {
+    const q = new URLSearchParams();
+    q.set('limit', String(params.limit ?? 20));
+    params.foods?.forEach(f => q.append('foods', f));
+    params.tools?.forEach(t => q.append('tools', t));
+    return request<{ items: RecipeSuggestion[] }>(`/api/recipes/suggestions?${q}`);
+  },
+
+  // Get a random recipe (two requests: first to get total pages, second to fetch random page).
+  // Accepts the same filter/cookbook params as getRecipes to scope the pick.
+  getRandomRecipe: async (params?: Omit<RecipeQueryParams, 'page' | 'perPage'>): Promise<RecipeSummary | null> => {
+    const first = await request<PaginatedResponse<RecipeSummary>>(`/api/recipes?${buildRecipeQuery({ ...params, page: 1, perPage: 1 })}`);
     if (!first.total) return null;
     const randomPage = Math.ceil(Math.random() * first.total_pages);
-    const data = await request<PaginatedResponse<RecipeSummary>>(`/api/recipes?page=${randomPage}&perPage=1&orderBy=name&orderDirection=asc`);
+    const data = await request<PaginatedResponse<RecipeSummary>>(`/api/recipes?${buildRecipeQuery({ ...params, page: randomPage, perPage: 1 })}`);
     return data.items[0] ?? null;
   },
 };

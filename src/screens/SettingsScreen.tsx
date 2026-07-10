@@ -1,11 +1,24 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Constants from 'expo-constants';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { getUnitSystemPreference, setUnitSystemPreference } from '../lib/unitConversion';
+import type { UnitSystemPreference } from '../lib/unitConversion';
+import { navigateToGuide } from '../navigation/navigateToGuide';
 import { colors, radius, spacing, typography } from '../theme';
 
 export default function SettingsScreen() {
   const { user, serverUrl, logout } = useAuth();
+  const navigation = useNavigation();
+  const [unitSystem, setUnitSystem] = useState<UnitSystemPreference>('original');
+
+  useEffect(() => { getUnitSystemPreference().then(setUnitSystem); }, []);
+
+  const chooseUnitSystem = async (pref: UnitSystemPreference) => {
+    setUnitSystem(pref);
+    await setUnitSystemPreference(pref);
+  };
 
   const handleLogout = () => {
     Alert.alert('Sign out', 'Disconnect from this Mealie server?', [
@@ -35,6 +48,43 @@ export default function SettingsScreen() {
           {user?.group ? <Row label="Group" value={user.group} /> : null}
           {user?.household ? <Row label="Household" value={user.household} /> : null}
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Preferences</Text>
+        <View style={styles.card}>
+          <View style={styles.prefRow}>
+            <Text style={styles.prefLabel}>Ingredient Units</Text>
+            <View style={styles.segmented}>
+              <TouchableOpacity
+                style={[styles.segment, unitSystem === 'original' && styles.segmentActive]}
+                onPress={() => chooseUnitSystem('original')}
+              >
+                <Text style={[styles.segmentText, unitSystem === 'original' && styles.segmentTextActive]}>
+                  As Written
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.segment, unitSystem === 'metric' && styles.segmentActive]}
+                onPress={() => chooseUnitSystem('metric')}
+              >
+                <Text style={[styles.segmentText, unitSystem === 'metric' && styles.segmentTextActive]}>
+                  Metric
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Help</Text>
+        <TouchableOpacity style={styles.card} onPress={() => navigateToGuide(navigation)}>
+          <View style={styles.guideRow}>
+            <Text style={styles.guideText}>How to Use Mealie Go</Text>
+            <Text style={styles.chevron}>›</Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
@@ -88,6 +138,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface, borderRadius: radius.md,
     paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border,
   },
+  prefRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: spacing.sm + 2,
+  },
+  prefLabel: { fontSize: typography.size.md, color: colors.textSecondary },
+  segmented: {
+    flexDirection: 'row', backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.md, padding: 3, borderWidth: 1, borderColor: colors.border,
+  },
+  segment: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.sm },
+  segmentActive: { backgroundColor: colors.primary },
+  segmentText: { fontSize: typography.size.xs, fontWeight: typography.weight.medium, color: colors.textSecondary },
+  segmentTextActive: { color: colors.textInverse },
+  guideRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: spacing.sm + 2,
+  },
+  guideText: { fontSize: typography.size.md, color: colors.textPrimary },
+  chevron: { fontSize: typography.size.lg, color: colors.textDisabled },
   signOutButton: {
     marginHorizontal: spacing.md, borderWidth: 1, borderColor: colors.error,
     borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center',

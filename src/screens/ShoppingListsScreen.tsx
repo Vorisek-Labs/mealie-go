@@ -6,6 +6,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { useShoppingLists } from '../hooks/useShoppingLists';
+import { navigateToGuide } from '../navigation/navigateToGuide';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
 import type { ShoppingStackParams } from '../navigation/RootNavigator';
@@ -48,9 +49,17 @@ export default function ShoppingListsScreen({ navigation }: Props) {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Shopping</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => setShowCreate(true)}>
-          <Text style={styles.addButtonText}>+</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.guideButton}
+            onPress={() => navigateToGuide(navigation, 'shopping')}
+          >
+            <Text style={styles.guideButtonText}>?</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addButton} onPress={() => setShowCreate(true)}>
+            <Text style={styles.addButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -128,6 +137,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingBottom: spacing.md,
   },
   title: { fontSize: typography.size.xxl, fontWeight: typography.weight.bold, color: colors.textPrimary },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  guideButton: {
+    width: 28, height: 28, borderRadius: radius.full,
+    borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  guideButtonText: { fontSize: typography.size.sm, fontWeight: typography.weight.bold, color: colors.textDisabled },
   addButton: {
     width: 36, height: 36, borderRadius: radius.full,
     backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',

@@ -4,6 +4,7 @@ export interface UserProfile {
   fullName?: string;
   email?: string;
   group: string;
+  groupSlug: string;
   household: string;
   admin: boolean;
 }
@@ -26,6 +27,13 @@ export interface RecipeCategory {
   id?: string;
   name: string;
   slug: string;
+}
+
+export interface RecipeTool {
+  id?: string;
+  name: string;
+  slug: string;
+  onHand?: boolean;
 }
 
 export interface RecipeUnit {
@@ -56,6 +64,13 @@ export interface RecipeSummary {
   lastMade?: string;
   tags: RecipeTag[];
   recipeCategory: RecipeCategory[];
+  tools?: RecipeTool[];
+}
+
+export interface UserRatingSummary {
+  recipeId: string;
+  rating?: number;
+  isFavorite: boolean;
 }
 
 export interface RecipeIngredient {
@@ -191,4 +206,28 @@ export interface Cookbook {
   slug: string;
   position: number;
   public: boolean;
+  queryFilterString?: string;
+}
+
+export interface CookbookInput {
+  name: string;
+  description?: string;
+  public?: boolean;
+  position?: number;
+  queryFilterString?: string;
+}
+
+export interface RecipeShareToken {
+  id: string;
+  recipeId: string;
+  groupId: string;
+  expiresAt: string;
+  createdAt: string;
+  recipe?: Recipe;
+}
+
+export interface RecipeSuggestion {
+  recipe: RecipeSummary;
+  missingFoods: RecipeFood[];
+  missingTools: RecipeTool[];
 }
