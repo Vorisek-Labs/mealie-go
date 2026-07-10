@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator, Alert, Image, Linking, Modal, ScrollView, Share,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -12,6 +12,8 @@ import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { api, recipeAssetUrl, recipeImageSource } from '../lib/mealieApi';
+import CookModeModal from '../components/CookModeModal';
+import { displayCookTime, formatTimeText } from '../lib/timeEstimate';
 import {
   convertToMetric, convertInstructionTemperatures,
   getUnitSystemPreference, setUnitSystemPreference,
@@ -74,10 +76,13 @@ function buildRecipePdfHtml(recipe: Recipe, imageTag: string): string {
   const notes = recipe.notes
     .map(n => `<div class="note">${n.title ? `<strong>${escapeHtml(n.title)}</strong><br/>` : ''}${escapeHtml(n.text)}</div>`)
     .join('');
+  const prepTime = formatTimeText(recipe.prepTime);
+  const cookTime = displayCookTime(recipe);
+  const totalTime = formatTimeText(recipe.totalTime);
   const meta = [
-    recipe.prepTime ? `Prep: ${escapeHtml(recipe.prepTime)}` : '',
-    recipe.cookTime ? `Cook: ${escapeHtml(recipe.cookTime)}` : '',
-    recipe.totalTime ? `Total: ${escapeHtml(recipe.totalTime)}` : '',
+    prepTime ? `Prep: ${escapeHtml(prepTime)}` : '',
+    cookTime ? `Cook: ${escapeHtml(cookTime)}` : '',
+    totalTime ? `Total: ${escapeHtml(totalTime)}` : '',
     recipe.recipeYield ? `Serves: ${escapeHtml(recipe.recipeYield)}` : '',
   ].filter(Boolean).join(' &nbsp;·&nbsp; ');
 
@@ -141,6 +146,51 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
   const [shoppingLists, setShoppingLists] = useState<ShoppingList[]>([]);
   const [listPickerLoading, setListPickerLoading] = useState(false);
   const [addingToListId, setAddingToListId] = useState<string | null>(null);
+
+  const [showCookMode, setShowCookMode] = useState(false);
+
+  const scale = servings / (originalServings || 1);
+
+  // Shared by the Ingredients tab and Cook Mode, so both show the exact
+  // same scaled/unit-converted text without recomputing it twice.
+  const ingredientDisplayLines = useMemo(() => {
+    if (!recipe) return [];
+    return recipe.recipeIngredient.map(ing => {
+      const scaledQty = ing.quantity && scale !== 1 ? formatQty(ing.quantity * scale) : null;
+      const base = ing.display ?? ing.originalText ?? [
+        ing.quantity ? String(ing.quantity) : '',
+        ing.unit?.abbreviation ?? ing.unit?.name ?? '',
+        ing.food?.name ?? '',
+        ing.note ? `(${ing.note})` : '',
+      ].filter(Boolean).join(' ');
+      let displayText = scaledQty && ing.quantity
+        ? base.replace(String(ing.quantity), scaledQty)
+        : base;
+
+      if (unitSystem === 'metric' && ing.quantity) {
+        const effectiveQty = scaledQty ? parseFloat(scaledQty) : ing.quantity;
+        const converted = convertToMetric(effectiveQty, ing.unit);
+        if (converted) {
+          const qtyToken = scaledQty ?? String(ing.quantity);
+          displayText = displayText.replace(qtyToken, formatQty(converted.quantity));
+          const unitWord = ing.unit?.abbreviation || ing.unit?.name;
+          if (unitWord) {
+            const re = new RegExp(`\\b${escapeRegex(unitWord)}\\b`, 'i');
+            displayText = displayText.replace(re, converted.unitLabel);
+          }
+        }
+      }
+      return displayText;
+    });
+  }, [recipe, scale, unitSystem]);
+
+  const cookModeSteps = useMemo(() => {
+    if (!recipe) return [];
+    return recipe.recipeInstructions.map(step => ({
+      title: step.title,
+      text: unitSystem === 'metric' ? convertInstructionTemperatures(step.text) : step.text,
+    }));
+  }, [recipe, unitSystem]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -443,11 +493,13 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
     );
   }
 
-  const scale = servings / (originalServings || 1);
   const imgSrc = recipe.image && serverUrl && !imgError
     ? recipeImageSource(serverUrl, token, recipe.id, recipe.image)
     : null;
   const favorite = isFavorite(recipe.id);
+  const prepTimeDisplay = formatTimeText(recipe.prepTime);
+  const cookTimeDisplay = displayCookTime(recipe);
+  const totalTimeDisplay = formatTimeText(recipe.totalTime);
 
   const TABS: { key: ActiveTab; label: string }[] = [
     { key: 'ingredients', label: 'Ingredients' },
@@ -516,20 +568,20 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
         <View style={styles.content}>
           <Text style={styles.recipeName}>{recipe.name}</Text>
 
+          {(prepTimeDisplay || cookTimeDisplay || totalTimeDisplay || recipe.recipeYield) && (
+            <View style={styles.metaRow}>
+              {prepTimeDisplay ? <MetaStat label="Prep" value={prepTimeDisplay} /> : null}
+              {cookTimeDisplay ? <MetaStat label="Cook" value={cookTimeDisplay} /> : null}
+              {totalTimeDisplay ? <MetaStat label="Total" value={totalTimeDisplay} /> : null}
+              {recipe.recipeYield ? <MetaStat label="Serves" value={recipe.recipeYield} /> : null}
+            </View>
+          )}
+
           <StarRating rating={rating} onRate={handleRate} />
 
           {recipe.description ? (
             <Text style={styles.description}>{recipe.description}</Text>
           ) : null}
-
-          {(recipe.prepTime || recipe.cookTime || recipe.totalTime || recipe.recipeYield) && (
-            <View style={styles.metaRow}>
-              {recipe.prepTime ? <MetaStat label="Prep" value={recipe.prepTime} /> : null}
-              {recipe.cookTime ? <MetaStat label="Cook" value={recipe.cookTime} /> : null}
-              {recipe.totalTime ? <MetaStat label="Total" value={recipe.totalTime} /> : null}
-              {recipe.recipeYield ? <MetaStat label="Serves" value={recipe.recipeYield} /> : null}
-            </View>
-          )}
 
           {hasNutrition && recipe.nutrition && (
             <View style={styles.nutritionBox}>
@@ -590,46 +642,24 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
               <TouchableOpacity style={styles.addToListBtn} onPress={openListPicker}>
                 <Text style={styles.addToListBtnText}>🛒 Add Ingredients to Shopping List</Text>
               </TouchableOpacity>
-              {recipe.recipeIngredient.length === 0 ? (
+              {ingredientDisplayLines.length === 0 ? (
                 <Text style={styles.emptyText}>No ingredients listed</Text>
-              ) : recipe.recipeIngredient.map((ing, i) => {
-                const scaledQty = ing.quantity && scale !== 1 ? formatQty(ing.quantity * scale) : null;
-                const base = ing.display ?? ing.originalText ?? [
-                  ing.quantity ? String(ing.quantity) : '',
-                  ing.unit?.abbreviation ?? ing.unit?.name ?? '',
-                  ing.food?.name ?? '',
-                  ing.note ? `(${ing.note})` : '',
-                ].filter(Boolean).join(' ');
-                let displayText = scaledQty && ing.quantity
-                  ? base.replace(String(ing.quantity), scaledQty)
-                  : base;
-
-                if (unitSystem === 'metric' && ing.quantity) {
-                  const effectiveQty = scaledQty ? parseFloat(scaledQty) : ing.quantity;
-                  const converted = convertToMetric(effectiveQty, ing.unit);
-                  if (converted) {
-                    const qtyToken = scaledQty ?? String(ing.quantity);
-                    displayText = displayText.replace(qtyToken, formatQty(converted.quantity));
-                    const unitWord = ing.unit?.abbreviation || ing.unit?.name;
-                    if (unitWord) {
-                      const re = new RegExp(`\\b${escapeRegex(unitWord)}\\b`, 'i');
-                      displayText = displayText.replace(re, converted.unitLabel);
-                    }
-                  }
-                }
-
-                return (
-                  <View key={i} style={styles.ingredient}>
-                    <View style={styles.bullet} />
-                    <Text style={styles.ingredientText}>{displayText}</Text>
-                  </View>
-                );
-              })}
+              ) : ingredientDisplayLines.map((displayText, i) => (
+                <View key={i} style={styles.ingredient}>
+                  <View style={styles.bullet} />
+                  <Text style={styles.ingredientText}>{displayText}</Text>
+                </View>
+              ))}
             </View>
           )}
 
           {activeTab === 'steps' && (
             <View style={styles.section}>
+              {recipe.recipeInstructions.length > 0 && (
+                <TouchableOpacity style={styles.addToListBtn} onPress={() => setShowCookMode(true)}>
+                  <Text style={styles.addToListBtnText}>👨‍🍳 Start Cooking</Text>
+                </TouchableOpacity>
+              )}
               {recipe.recipeInstructions.length === 0 ? (
                 <Text style={styles.emptyText}>No instructions listed</Text>
               ) : recipe.recipeInstructions.map((step, i) => (
@@ -828,6 +858,14 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
           </View>
         </View>
       </Modal>
+
+      <CookModeModal
+        visible={showCookMode}
+        onClose={() => setShowCookMode(false)}
+        recipeName={recipe.name}
+        steps={cookModeSteps}
+        ingredientLines={ingredientDisplayLines}
+      />
     </View>
   );
 }
@@ -835,7 +873,9 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
 function MetaStat({ label, value }: { label: string; value: string }) {
   return (
     <View style={metaStyles.container}>
-      <Text style={metaStyles.value}>{value}</Text>
+      <View style={metaStyles.valueBox}>
+        <Text style={metaStyles.value}>{value}</Text>
+      </View>
       <Text style={metaStyles.label}>{label}</Text>
     </View>
   );
@@ -851,8 +891,16 @@ function NutrStat({ label, value }: { label: string; value: string }) {
 }
 
 const metaStyles = StyleSheet.create({
-  container: { alignItems: 'center', flex: 1 },
-  value: { fontSize: typography.size.md, fontWeight: typography.weight.semibold, color: colors.textPrimary },
+  // justifyContent: 'flex-end' anchors each stat's label to the bottom of
+  // the row regardless of how many lines its value wraps to (e.g. "15
+  // minutes" vs "4 hours 5 minutes") — otherwise labels for shorter values
+  // sit higher than labels for values that wrap to two lines.
+  container: { alignItems: 'center', justifyContent: 'flex-end', flex: 1 },
+  // Fixed-height box (two lines' worth) so a one-line value ("15 minutes")
+  // centers vertically against a two-line value ("4 hours 5 minutes")
+  // instead of sitting flush with its bottom line.
+  valueBox: { minHeight: 18 * 2, justifyContent: 'center' },
+  value: { fontSize: typography.size.md, lineHeight: 18, fontWeight: typography.weight.semibold, color: colors.textPrimary, textAlign: 'center' },
   label: { fontSize: typography.size.xs, color: colors.textSecondary, marginTop: 2 },
 });
 

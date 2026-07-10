@@ -4,9 +4,11 @@ import { colors, radius, spacing, typography } from '../theme';
 import { filterOptionName } from '../hooks/useRecipeFilterOptions';
 import type { FilterOptionSets } from '../hooks/useRecipeFilterOptions';
 import type { RecipeFilters } from '../hooks/useRecipes';
+import { timeBucketLabel } from '../lib/timeEstimate';
 
 type FilterKey = keyof RecipeFilters;
-const KEYS: FilterKey[] = ['tags', 'categories', 'tools', 'foods'];
+type ListFilterKey = 'tags' | 'categories' | 'tools' | 'foods';
+const KEYS: ListFilterKey[] = ['tags', 'categories', 'tools', 'foods'];
 
 interface Props {
   filters: RecipeFilters;
@@ -15,12 +17,29 @@ interface Props {
 }
 
 export default function ActiveFilterChips({ filters, options, onRemove }: Props) {
-  const count = filters.tags.length + filters.categories.length + filters.tools.length + filters.foods.length;
+  const count = filters.tags.length + filters.categories.length + filters.tools.length + filters.foods.length
+    + (filters.maxPrepMinutes ? 1 : 0) + (filters.maxCookMinutes ? 1 : 0);
   if (count === 0) return null;
 
   return (
     <View style={styles.bar}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        {filters.maxPrepMinutes ? (
+          <TouchableOpacity
+            style={styles.chip}
+            onPress={() => onRemove('maxPrepMinutes', '')}
+          >
+            <Text style={styles.chipText}>Prep: {timeBucketLabel(filters.maxPrepMinutes)} ✕</Text>
+          </TouchableOpacity>
+        ) : null}
+        {filters.maxCookMinutes ? (
+          <TouchableOpacity
+            style={styles.chip}
+            onPress={() => onRemove('maxCookMinutes', '')}
+          >
+            <Text style={styles.chipText}>Cook: {timeBucketLabel(filters.maxCookMinutes)} ✕</Text>
+          </TouchableOpacity>
+        ) : null}
         {KEYS.flatMap(key =>
           filters[key].map(value => (
             <TouchableOpacity

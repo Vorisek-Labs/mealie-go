@@ -58,6 +58,11 @@ export interface RecipeSummary {
   recipeYield?: string;
   totalTime?: string;
   prepTime?: string;
+  // Mealie's own edit UI writes "Cook Time" to this field, labeled
+  // "performTime" internally — `cookTime` below is a separate legacy field
+  // only ever populated by recipe-URL imports/migration scrapers, never by
+  // hand-editing a recipe in Mealie itself.
+  performTime?: string;
   cookTime?: string;
   rating?: number;
   dateAdded?: string;

@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
-  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import {
-  api, login, saveServerUrl, saveToken, saveAccount, getSavedAccounts,
+  api, login, saveServerUrl, saveToken, saveAccount, removeAccount, getSavedAccounts,
 } from '../../lib/mealieApi';
 import type { SavedAccount } from '../../lib/mealieApi';
 import { colors, radius, spacing, typography } from '../../theme';
@@ -16,6 +16,7 @@ export default function ConnectScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
   const [showServerDrop, setShowServerDrop] = useState(false);
   const [showUserDrop, setShowUserDrop] = useState(false);
@@ -75,7 +76,14 @@ export default function ConnectScreen() {
       const token = await login(url, user, pass);
       await Promise.all([saveServerUrl(url), saveToken(token)]);
       const profile = await api.getSelf();
-      await saveAccount({ serverUrl: url, username: user, password: pass });
+      if (remember) {
+        await saveAccount({ serverUrl: url, username: user, password: pass });
+      } else {
+        // Someone may have saved this exact account from an earlier login —
+        // turning "remember" off now should actually forget it, not just
+        // skip re-saving it.
+        await removeAccount(url, user);
+      }
       await signIn(url, token, profile);
     } catch (e) {
       Alert.alert('Connection failed', e instanceof Error ? e.message : 'Could not connect to server.');
@@ -205,6 +213,20 @@ export default function ConnectScreen() {
           </View>
 
           <TouchableOpacity
+            style={styles.rememberRow}
+            onPress={() => setRemember(r => !r)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.rememberLabel}>Remember this account</Text>
+            <Switch
+              value={remember}
+              onValueChange={setRemember}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.textPrimary}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleConnect}
             disabled={loading}
@@ -217,7 +239,9 @@ export default function ConnectScreen() {
         </View>
 
         <Text style={styles.hint}>
-          Your credentials are saved on this device so you don't have to re-enter them.
+          {remember
+            ? "Your username and password are encrypted and saved on this device so you don't have to re-enter them."
+            : "This account won't be saved — you'll need to re-enter your credentials next time."}
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -317,6 +341,16 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   dropItemText: {
+    fontSize: typography.size.md,
+    color: colors.textPrimary,
+  },
+  rememberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.xs,
+  },
+  rememberLabel: {
     fontSize: typography.size.md,
     color: colors.textPrimary,
   },

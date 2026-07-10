@@ -44,8 +44,13 @@ export default function CookbookDetailScreen({ navigation, route }: Props) {
     ensureLoaded();
   };
 
-  const removeFilter = (key: FilterKey, value: string) =>
+  const removeFilter = (key: FilterKey, value: string) => {
+    if (key === 'maxPrepMinutes' || key === 'maxCookMinutes') {
+      applyFilters({ ...filters, [key]: undefined });
+      return;
+    }
     applyFilters({ ...filters, [key]: filters[key].filter(v => v !== value) });
+  };
 
   const handleRandom = async () => {
     setRandomizing(true);

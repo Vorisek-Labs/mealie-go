@@ -45,6 +45,16 @@ export async function saveAccount(account: SavedAccount): Promise<void> {
   await SecureStore.setItemAsync(SAVED_ACCOUNTS_KEY, JSON.stringify(filtered));
 }
 
+// Used when someone signs in with "Remember this account" turned off — if a
+// password for that exact server + username was saved from an earlier login,
+// leaving it in place would make the toggle a lie.
+export async function removeAccount(serverUrl: string, username: string): Promise<void> {
+  const accounts = await getSavedAccounts();
+  const filtered = accounts.filter(a => !(a.serverUrl === serverUrl && a.username === username));
+  if (filtered.length === accounts.length) return;
+  await SecureStore.setItemAsync(SAVED_ACCOUNTS_KEY, JSON.stringify(filtered));
+}
+
 export async function getServerUrl(): Promise<string> {
   return (await AsyncStorage.getItem(SERVER_URL_KEY)) ?? '';
 }

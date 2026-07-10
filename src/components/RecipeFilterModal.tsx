@@ -6,6 +6,7 @@ import { colors, radius, spacing, typography } from '../theme';
 import { EMPTY_FILTERS } from '../hooks/useRecipes';
 import type { RecipeFilters } from '../hooks/useRecipes';
 import type { FilterOptionSets } from '../hooks/useRecipeFilterOptions';
+import { TIME_BUCKETS } from '../lib/timeEstimate';
 import type { RecipeFood } from '../types';
 
 type FilterKey = keyof RecipeFilters;
@@ -29,10 +30,19 @@ export default function RecipeFilterModal({ visible, loading, options, filters, 
   const toggleDraft = (key: FilterKey, value: string) =>
     setDraft(prev => ({
       ...prev,
-      [key]: prev[key].includes(value) ? prev[key].filter(v => v !== value) : [...prev[key], value],
+      [key]: (prev[key] as string[]).includes(value)
+        ? (prev[key] as string[]).filter(v => v !== value)
+        : [...(prev[key] as string[]), value],
     }));
 
-  const draftCount = draft.tags.length + draft.categories.length + draft.tools.length + draft.foods.length;
+  // Single-select per field: tapping the active bucket again clears it.
+  const selectPrepBucket = (value: number) =>
+    setDraft(prev => ({ ...prev, maxPrepMinutes: prev.maxPrepMinutes === value ? undefined : value }));
+  const selectCookBucket = (value: number) =>
+    setDraft(prev => ({ ...prev, maxCookMinutes: prev.maxCookMinutes === value ? undefined : value }));
+
+  const draftCount = draft.tags.length + draft.categories.length + draft.tools.length + draft.foods.length
+    + (draft.maxPrepMinutes ? 1 : 0) + (draft.maxCookMinutes ? 1 : 0);
 
   const applyAndClose = () => {
     onApply(draft);
@@ -73,6 +83,16 @@ export default function RecipeFilterModal({ visible, loading, options, filters, 
               selected={draft.categories}
               onToggle={v => toggleDraft('categories', v)}
             />
+            <TimeBucketSection
+              label="PREP TIME"
+              selected={draft.maxPrepMinutes}
+              onSelect={selectPrepBucket}
+            />
+            <TimeBucketSection
+              label="COOK TIME"
+              selected={draft.maxCookMinutes}
+              onSelect={selectCookBucket}
+            />
             <ChipSection
               label="TAGS"
               options={options.tags.map(t => ({ value: t.slug, name: t.name }))}
@@ -107,6 +127,34 @@ export default function RecipeFilterModal({ visible, loading, options, filters, 
         </TouchableOpacity>
       </View>
     </Modal>
+  );
+}
+
+function TimeBucketSection({ label, selected, onSelect }: {
+  label: string;
+  selected?: number;
+  onSelect: (value: number) => void;
+}) {
+  return (
+    <>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      <View style={styles.chipRow}>
+        {TIME_BUCKETS.map(bucket => {
+          const active = selected === bucket.value;
+          return (
+            <TouchableOpacity
+              key={bucket.value}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => onSelect(bucket.value)}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                {bucket.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </>
   );
 }
 

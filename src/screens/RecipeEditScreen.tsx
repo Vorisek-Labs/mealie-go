@@ -6,6 +6,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { api } from '../lib/mealieApi';
+import { formatTimeText } from '../lib/timeEstimate';
 import { colors, radius, spacing, typography } from '../theme';
 import type { Recipe, RecipeTag, RecipeCategory } from '../types';
 import type { RecipesStackParams } from '../navigation/RootNavigator';
@@ -45,7 +46,11 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
   const [description, setDescription] = useState('');
   const [recipeYield, setRecipeYield] = useState('');
   const [prepTime, setPrepTime] = useState('');
-  const [cookTime, setCookTime] = useState('');
+  // Mealie's own edit UI writes "Cook Time" to `performTime`, not the legacy
+  // `cookTime` field (that one's only ever populated by URL/migration
+  // imports) — matching that here so edits made in this app show up
+  // correctly in Mealie's own web UI too.
+  const [performTime, setPerformTime] = useState('');
   const [totalTime, setTotalTime] = useState('');
   const [ingredients, setIngredients] = useState<IngDraft[]>([]);
   const [steps, setSteps] = useState<StepDraft[]>([]);
@@ -62,9 +67,9 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         setName(r.name);
         setDescription(r.description ?? '');
         setRecipeYield(r.recipeYield ?? '');
-        setPrepTime(r.prepTime ?? '');
-        setCookTime(r.cookTime ?? '');
-        setTotalTime(r.totalTime ?? '');
+        setPrepTime(formatTimeText(r.prepTime) ?? '');
+        setPerformTime(formatTimeText(r.performTime) ?? formatTimeText(r.cookTime) ?? '');
+        setTotalTime(formatTimeText(r.totalTime) ?? '');
         setSelectedTags(r.tags ?? []);
         setSelectedCategories(r.recipeCategory ?? []);
         setIngredients(r.recipeIngredient.map((ing, i) => ({
@@ -112,7 +117,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         description: description.trim() || undefined,
         recipeYield: recipeYield.trim() || undefined,
         prepTime: prepTime.trim() || undefined,
-        cookTime: cookTime.trim() || undefined,
+        performTime: performTime.trim() || undefined,
         totalTime: totalTime.trim() || undefined,
         tags: selectedTags,
         recipeCategory: selectedCategories,
@@ -222,8 +227,8 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
             <Text style={styles.label}>Cook Time</Text>
             <TextInput
               style={styles.input}
-              value={cookTime}
-              onChangeText={setCookTime}
+              value={performTime}
+              onChangeText={setPerformTime}
               placeholder="30 min"
               placeholderTextColor={colors.textDisabled}
             />

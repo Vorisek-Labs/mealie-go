@@ -39,7 +39,9 @@ export function useRecipeFilterOptions() {
   return { options, loading, ensureLoaded };
 }
 
-export function filterOptionName(options: FilterOptionSets, key: keyof RecipeFilters, value: string): string {
+type ListFilterKey = Exclude<keyof RecipeFilters, 'maxPrepMinutes' | 'maxCookMinutes'>;
+
+export function filterOptionName(options: FilterOptionSets, key: ListFilterKey, value: string): string {
   switch (key) {
     case 'tags': return options.tags.find(t => t.slug === value)?.name ?? value;
     case 'categories': return options.categories.find(c => c.slug === value)?.name ?? value;

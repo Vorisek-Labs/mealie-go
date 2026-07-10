@@ -9,6 +9,7 @@ import { useRecipes } from '../hooks/useRecipes';
 import { useRecipeFilterOptions } from '../hooks/useRecipeFilterOptions';
 import type { RecipeFilters } from '../hooks/useRecipes';
 import { api } from '../lib/mealieApi';
+import { matchesCookTimeBucket, matchesPrepTimeBucket } from '../lib/timeEstimate';
 import { useFavorites } from '../context/FavoritesContext';
 import RecipeCard from '../components/RecipeCard';
 import RecipeFilterModal from '../components/RecipeFilterModal';
@@ -67,8 +68,13 @@ export default function RecipesScreen({ navigation }: Props) {
     ensureLoaded();
   };
 
-  const removeFilter = (key: FilterKey, value: string) =>
+  const removeFilter = (key: FilterKey, value: string) => {
+    if (key === 'maxPrepMinutes' || key === 'maxCookMinutes') {
+      applyFilters({ ...filters, [key]: undefined });
+      return;
+    }
     applyFilters({ ...filters, [key]: filters[key].filter(v => v !== value) });
+  };
 
   const handleRandom = async () => {
     setRandomizing(true);
@@ -87,7 +93,11 @@ export default function RecipesScreen({ navigation }: Props) {
   };
 
   const displayedRecipes = favoritesOnly
-    ? favoriteRecipesFull.filter(r => favoriteIds.has(r.id))
+    ? favoriteRecipesFull.filter(r =>
+        favoriteIds.has(r.id)
+        && matchesPrepTimeBucket(r, filters.maxPrepMinutes)
+        && matchesCookTimeBucket(r, filters.maxCookMinutes)
+      )
     : recipes;
   const showLoading = favoritesOnly ? loadingFavorites : loading;
 
