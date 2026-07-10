@@ -380,6 +380,49 @@ npx tsc --noEmit      # type check
 
 ---
 
+## Play Store Release Signing
+
+`.\gradlew bundleRelease` (run from `android/`) produces the `.aab` for Play Console upload, at
+`android/app/build/outputs/bundle/release/app-release.aab`.
+
+**The upload keystore is `mealie-go-upload-key.jks` at the project root** (gitignored, `*.jks` —
+never commit it). This is a Play App Signing "upload key" (Google holds the actual distribution
+signing key; if this upload key is ever lost, Google has a self-service reset process since this
+isn't the final signing authority — still don't lose it carelessly).
+
+The keystore path/alias/passwords live in `plugins/withReleaseSigning.js` are NOT hardcoded —
+they're picked up from **`~/.gradle/gradle.properties`** (the Windows *user-level* Gradle config,
+completely outside this repo — not `android/gradle.properties`, which gets wiped every time
+`expo prebuild --clean` regenerates `android/`):
+```
+MEALIEGO_UPLOAD_STORE_FILE=C:/Users/Ken_R/mealiego/mealie-go-upload-key.jks
+MEALIEGO_UPLOAD_KEY_ALIAS=mealie-go-upload
+MEALIEGO_UPLOAD_STORE_PASSWORD=<...>
+MEALIEGO_UPLOAD_KEY_PASSWORD=<...>
+```
+**Use forward slashes in that path**, even on Windows — Java `.properties` file parsing treats
+backslash as an escape character, and `\U`, `\K`, `\m` etc. aren't recognized escapes, so the
+backslash (and thus the whole path) silently gets mangled. Forward slashes sidestep this and
+Windows/Gradle both accept them fine. (This bit us once — the first `bundleRelease` attempt failed
+with "keystore file ... not found" because the path had collapsed to garbage.)
+
+`plugins/withReleaseSigning.js` is a config plugin (registered in `app.json`'s `plugins` array) that
+patches `android/app/build.gradle` on every prebuild to add a `signingConfigs.release` block reading
+those properties, and repoints `buildTypes.release.signingConfig` at it instead of
+`signingConfigs.debug` — **the RN/Expo template default is to sign "release" builds with the debug
+keystore**, which is not fit for a real release. Without this plugin, every `expo prebuild --clean`
+would silently reset release builds back to debug-signed.
+
+To verify a build is actually signed with the upload key (not debug) before uploading anywhere:
+```powershell
+& "C:\Program Files\Android\Android Studio\jbr\bin\jarsigner.exe" -verify -verbose -certs app-release.aab
+```
+Should show `CN=Vorisek Labs, OU=Mealie Go, O=Vorisek Labs, C=US` and "jar verified" — that's our
+keystore's identity, set when it was generated. `android.versionCode` in `app.json` must increment
+on every new Play Console upload (currently `1`).
+
+---
+
 ## Assets
 
 `assets/icon.png` and `assets/adaptive-icon.png` are the real Mealie Go branded icon (dark rounded
@@ -421,7 +464,21 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 ## Current Build Status
 
-**Session (latest) — 2026-07-09**
+**Session (latest) — 2026-07-10**
+
+### Session 2026-07-10 (part 1) — first signed release AAB, for Play Console upload
+- Generated the Play Store upload keystore (`mealie-go-upload-key.jks`, project root, gitignored)
+  and wired up durable release signing — see the new Play Store Release Signing section above for
+  full detail (keystore location, `~/.gradle/gradle.properties` credentials, the
+  `withReleaseSigning` config plugin, and the forward-slash-path gotcha that broke the first
+  attempt).
+- Added `android.versionCode: 1` to `app.json` (required by Play Console, wasn't set before since
+  nothing had shipped past local ADB installs yet).
+- Built and verified `app-release.aab` — confirmed via `jarsigner -verify` that it's actually
+  signed with the upload key (`CN=Vorisek Labs, OU=Mealie Go`), not the debug keystore the RN/Expo
+  template defaults to.
+- NEEDS: Ken to actually create the Play Console listing and upload this AAB — that part is fully
+  outside this repo/codebase.
 
 ### Session 2026-07-09 (part 8) — full security audit + fixes, ahead of going public
 User asked for a full security audit ahead of/after making the repo public, since self-hosters

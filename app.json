@@ -24,6 +24,7 @@
         "backgroundColor": "#0F0D0A"
       },
       "package": "com.voriseklabs.mealinego",
+      "versionCode": 1,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW"
@@ -48,7 +49,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "./plugins/withReleaseSigning.js"
     ]
   }
 }
