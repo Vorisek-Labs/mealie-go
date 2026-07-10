@@ -13,7 +13,7 @@ It lets you and your friends/family browse recipes, plan meals, manage shopping 
 Target platforms: Android (primary), iOS (secondary).
 One codebase via React Native + Expo targeting both.
 
-Play Store package: `com.voriseklabs.mealinego`
+Play Store package: `com.voriseklabs.mealiego`
 
 ---
 
@@ -439,8 +439,8 @@ adaptive-icon safe zone is the center 66% of the canvas, so anything larger risk
 | Service | Notes |
 |---|---|
 | GitHub | github.com/Vorisek-Labs/mealie-go |
-| Google Play Console | Package: `com.voriseklabs.mealinego` |
-| Apple Developer | Bundle: `com.voriseklabs.mealinego` |
+| Google Play Console | Package: `com.voriseklabs.mealiego` |
+| Apple Developer | Bundle: `com.voriseklabs.mealiego` |
 
 Publisher account credentials for the above are kept locally, not in this repo.
 

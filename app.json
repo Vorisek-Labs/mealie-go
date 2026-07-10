@@ -16,14 +16,14 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.voriseklabs.mealinego"
+      "bundleIdentifier": "com.voriseklabs.mealiego"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F0D0A"
       },
-      "package": "com.voriseklabs.mealinego",
+      "package": "com.voriseklabs.mealiego",
       "versionCode": 2,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
