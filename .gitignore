@@ -13,3 +13,7 @@ android/
 ios/
 .env
 .claude/settings.local.json
+
+# Not app source — lives in the private mealie-go-private repo instead
+/store/
+/website/
