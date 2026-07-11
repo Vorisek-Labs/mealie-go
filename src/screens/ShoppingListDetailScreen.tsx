@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, FlatList, Modal, StyleSheet, Text,
   TextInput, TouchableOpacity, View, ScrollView,
@@ -7,6 +7,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { useShoppingListDetail } from '../hooks/useShoppingLists';
 import { api } from '../lib/mealieApi';
+import { findPossibleMatchIds } from '../lib/shoppingMatch';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
 import type { RecipeSummary, ShoppingListItem } from '../types';
@@ -157,6 +158,12 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
   const total = list?.listItems.length ?? 0;
   const done = checked.length;
 
+  // Items with no structured food link that might be the same thing as
+  // another item, worded differently (Mealie's server already auto-merges
+  // items that DO share a structured food, so this only covers what that
+  // can't reach). Flagged, not auto-merged -- see lib/shoppingMatch.ts.
+  const possibleMatchIds = useMemo(() => findPossibleMatchIds(unchecked), [unchecked]);
+
   // Group unchecked by label
   const buildGroups = (): GroupedSection[] => {
     if (!list || labels.length === 0) {
@@ -183,8 +190,14 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
   const groups = buildGroups();
   const hasLabels = labels.length > 0;
 
+  const explainPossibleMatch = () => Alert.alert(
+    'Possibly the same item',
+    'This looks like it might be the same food as another item on your list, just worded differently. Check for a similar item nearby, and combine them yourself if so.',
+  );
+
   const renderItem = (item: ShoppingListItem) => {
     const label = item.display ?? item.note ?? item.food?.name ?? 'Item';
+    const flagged = possibleMatchIds.has(item.id);
     return (
       <TouchableOpacity
         style={styles.item}
@@ -196,6 +209,11 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
           {item.checked && <Text style={styles.checkmark}>✓</Text>}
         </View>
         <Text style={[styles.itemText, item.checked && styles.itemTextChecked]}>{label}</Text>
+        {flagged && !item.checked ? (
+          <TouchableOpacity onPress={explainPossibleMatch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.possibleMatchIcon}>≈</Text>
+          </TouchableOpacity>
+        ) : null}
         {item.quantity ? (
           <Text style={styles.itemQty}>×{item.quantity}</Text>
         ) : null}
@@ -414,6 +432,7 @@ const styles = StyleSheet.create({
   itemText: { flex: 1, fontSize: typography.size.md, color: colors.textPrimary },
   itemTextChecked: { color: colors.textDisabled, textDecorationLine: 'line-through' },
   itemQty: { fontSize: typography.size.sm, color: colors.textSecondary },
+  possibleMatchIcon: { fontSize: typography.size.md, color: colors.warning, fontWeight: typography.weight.bold },
   divider: { fontSize: typography.size.sm, fontWeight: typography.weight.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.background },
   addBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: spacing.sm, padding: spacing.sm, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
   addQtyInput: { width: 52, backgroundColor: colors.surfaceElevated, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, fontSize: typography.size.md, color: colors.textPrimary, borderWidth: 1, borderColor: colors.border, textAlign: 'center' },

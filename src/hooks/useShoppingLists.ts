@@ -99,27 +99,54 @@ export function useShoppingListDetail(listId: string) {
     await refresh();
   }, [listId, refresh]);
 
+  // Merges items with identical note text by summing their quantities onto
+  // one "keeper" and removing the rest — NOT by just deleting the extras,
+  // which would silently throw away however much of that item the deleted
+  // duplicates represented.
   const mergeDuplicates = useCallback(async () => {
     if (!list) return;
     const unchecked = list.listItems.filter(i => !i.checked);
-    const seen = new Map<string, ShoppingListItem>();
-    const toDelete: string[] = [];
+    const groups = new Map<string, ShoppingListItem[]>();
     for (const item of unchecked) {
       const key = (item.note ?? item.food?.name ?? '').trim().toLowerCase();
       if (!key) continue;
-      if (seen.has(key)) {
-        toDelete.push(item.id);
-      } else {
-        seen.set(key, item);
+      const group = groups.get(key) ?? [];
+      group.push(item);
+      groups.set(key, group);
+    }
+
+    const removedIds: string[] = [];
+    const keeperUpdates: Promise<unknown>[] = [];
+    const keeperResults = new Map<string, ShoppingListItem>();
+
+    for (const group of groups.values()) {
+      if (group.length < 2) continue;
+      const [keeper, ...rest] = group;
+      rest.forEach(i => removedIds.push(i.id));
+
+      const summedQty = group.reduce((sum, i) => sum + (i.quantity ?? 0), 0);
+      if (summedQty > 0 && summedQty !== keeper.quantity) {
+        const updated = { ...keeper, quantity: summedQty };
+        keeperResults.set(keeper.id, updated);
+        keeperUpdates.push(api.updateShoppingItem(keeper.id, updated));
       }
     }
-    if (toDelete.length === 0) return 0;
-    await Promise.all(toDelete.map(id => api.deleteShoppingItem(id)));
+
+    if (removedIds.length === 0) return 0;
+    await Promise.all([
+      ...keeperUpdates,
+      ...removedIds.map(id => api.deleteShoppingItem(id)),
+    ]);
     setList(prev => prev
-      ? { ...prev, listItems: prev.listItems.filter(i => !toDelete.includes(i.id)) }
+      ? {
+          ...prev,
+          listItems: prev.listItems
+            .filter(i => !removedIds.includes(i.id))
+            .map(i => keeperResults.get(i.id) ?? i),
+        }
       : prev
     );
-    return toDelete.length;
+    return removedIds.length;
   }, [list]);
 
   const duplicateCount = (() => {

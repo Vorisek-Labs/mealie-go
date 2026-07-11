@@ -15,7 +15,7 @@ import { api, recipeAssetUrl, recipeImageSource } from '../lib/mealieApi';
 import CookModeModal from '../components/CookModeModal';
 import { displayCookTime, formatTimeText } from '../lib/timeEstimate';
 import {
-  convertToMetric, convertInstructionTemperatures,
+  convertToMetric, convertInstructionTemperatures, scaleFreeformIngredientText,
   getUnitSystemPreference, setUnitSystemPreference,
 } from '../lib/unitConversion';
 import type { UnitSystemPreference } from '../lib/unitConversion';
@@ -48,6 +48,7 @@ function formatQty(qty: number): string {
   if (qty === Math.floor(qty)) return String(Math.floor(qty));
   return parseFloat(qty.toFixed(2)).toString();
 }
+
 
 function escapeHtml(text: string): string {
   return text
@@ -152,15 +153,27 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
   // quantity's string form didn't exactly match what was embedded in the
   // display text (e.g. quantity 0.5 but text says "1/2").
   //
-  // Falls back to the recipe's own text verbatim (unscaled) when there's no
-  // structured quantity to work with at all — ingredients created or edited
-  // through this app's own editor are saved as `disableAmount: true` with no
-  // structured quantity/unit/food, same as many freeform/URL-imported ones.
+  // `quantity` is falsy-checked, not null-checked: Mealie defaults it to 0
+  // (not null) when no structured amount was captured, same pattern as
+  // recipeServings defaulting to 0. Treating 0 as "a real quantity to scale"
+  // produced a bogus "0" prefix on every ingredient of an unstructured
+  // recipe. For those, the actual amount is often only in `note` or
+  // `originalText` — best-effort scale a leading number in that text
+  // instead of leaving it static or showing it wrapped in a stray "(...)".
   const ingredientDisplayLines = useMemo(() => {
     if (!recipe) return [];
     return recipe.recipeIngredient.map(ing => {
-      if (ing.disableAmount || ing.quantity == null) {
-        return ing.display ?? ing.originalText ?? '';
+      if (ing.disableAmount || !ing.quantity) {
+        const structuredParts = [
+          ing.unit?.abbreviation ?? ing.unit?.name ?? '',
+          ing.food?.name ?? '',
+        ].filter(Boolean);
+        const rawText = ing.display ?? ing.originalText ?? (
+          structuredParts.length > 0
+            ? [...structuredParts, ing.note ? `(${ing.note})` : ''].filter(Boolean).join(' ')
+            : (ing.note ?? '')
+        );
+        return ing.disableAmount ? rawText : scaleFreeformIngredientText(rawText, scale, unitSystem === 'metric');
       }
 
       const scaledQty = ing.quantity * scale;
@@ -497,10 +510,11 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
     ? recipeImageSource(serverUrl, token, recipe.id, recipe.image)
     : null;
   const favorite = isFavorite(recipe.id);
-  // Hides the scaler when there's nothing it could actually change — showing
-  // it for a recipe with no structured ingredient quantities would just be a
-  // dead control, the exact "nothing happens" experience being fixed here.
-  const hasScalableIngredients = recipe.recipeIngredient.some(i => !i.disableAmount && i.quantity != null);
+  // Hides the scaler only when truly nothing could change — every ingredient
+  // is explicitly marked as having no amount at all (disableAmount). Anything
+  // else is potentially scalable: either via a structured quantity, or via
+  // scaleFreeformIngredientText's best-effort text scaling in ingredientDisplayLines.
+  const hasScalableIngredients = recipe.recipeIngredient.some(i => !i.disableAmount);
   const prepTimeDisplay = formatTimeText(recipe.prepTime);
   const cookTimeDisplay = displayCookTime(recipe);
   const totalTimeDisplay = formatTimeText(recipe.totalTime);
