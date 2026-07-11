@@ -56,6 +56,12 @@ export interface RecipeSummary {
   image?: string;
   description?: string;
   recipeYield?: string;
+  // Mealie treats "how much this recipe produces" (recipeYield/recipeYieldQuantity,
+  // e.g. "8 jars, 0.5 pints each") and "how many people this feeds" (recipeServings)
+  // as genuinely separate fields, shown as separate stats in Mealie's own UI —
+  // recipeYield is NOT a serving count and shouldn't be parsed as one.
+  recipeServings?: number;
+  recipeYieldQuantity?: number;
   totalTime?: string;
   prepTime?: string;
   // Mealie's own edit UI writes "Cook Time" to this field, labeled

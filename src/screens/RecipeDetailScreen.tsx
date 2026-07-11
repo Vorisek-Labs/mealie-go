@@ -44,19 +44,9 @@ function StarRating({ rating, onRate }: { rating: number; onRate: (r: number) =>
   );
 }
 
-function parseServings(yieldStr?: string): number {
-  if (!yieldStr) return 1;
-  const match = yieldStr.match(/\d+(\.\d+)?/);
-  return match ? parseFloat(match[0]) : 1;
-}
-
 function formatQty(qty: number): string {
   if (qty === Math.floor(qty)) return String(Math.floor(qty));
   return parseFloat(qty.toFixed(2)).toString();
-}
-
-function escapeRegex(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function escapeHtml(text: string): string {
@@ -83,7 +73,8 @@ function buildRecipePdfHtml(recipe: Recipe, imageTag: string): string {
     prepTime ? `Prep: ${escapeHtml(prepTime)}` : '',
     cookTime ? `Cook: ${escapeHtml(cookTime)}` : '',
     totalTime ? `Total: ${escapeHtml(totalTime)}` : '',
-    recipe.recipeYield ? `Serves: ${escapeHtml(recipe.recipeYield)}` : '',
+    recipe.recipeYield ? `Yield: ${escapeHtml(recipe.recipeYield)}` : '',
+    recipe.recipeServings ? `Serves: ${escapeHtml(formatQty(recipe.recipeServings))}` : '',
   ].filter(Boolean).join(' &nbsp;·&nbsp; ');
 
   return `
@@ -153,34 +144,39 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
 
   // Shared by the Ingredients tab and Cook Mode, so both show the exact
   // same scaled/unit-converted text without recomputing it twice.
+  //
+  // Rebuilds each line fresh from its structured quantity/unit/food fields
+  // instead of string-replacing inside the pre-existing display text —
+  // matching how Mealie's own frontend scales ingredients. The old
+  // string-replace approach silently did nothing whenever the stored
+  // quantity's string form didn't exactly match what was embedded in the
+  // display text (e.g. quantity 0.5 but text says "1/2").
+  //
+  // Falls back to the recipe's own text verbatim (unscaled) when there's no
+  // structured quantity to work with at all — ingredients created or edited
+  // through this app's own editor are saved as `disableAmount: true` with no
+  // structured quantity/unit/food, same as many freeform/URL-imported ones.
   const ingredientDisplayLines = useMemo(() => {
     if (!recipe) return [];
     return recipe.recipeIngredient.map(ing => {
-      const scaledQty = ing.quantity && scale !== 1 ? formatQty(ing.quantity * scale) : null;
-      const base = ing.display ?? ing.originalText ?? [
-        ing.quantity ? String(ing.quantity) : '',
-        ing.unit?.abbreviation ?? ing.unit?.name ?? '',
-        ing.food?.name ?? '',
-        ing.note ? `(${ing.note})` : '',
-      ].filter(Boolean).join(' ');
-      let displayText = scaledQty && ing.quantity
-        ? base.replace(String(ing.quantity), scaledQty)
-        : base;
+      if (ing.disableAmount || ing.quantity == null) {
+        return ing.display ?? ing.originalText ?? '';
+      }
 
-      if (unitSystem === 'metric' && ing.quantity) {
-        const effectiveQty = scaledQty ? parseFloat(scaledQty) : ing.quantity;
-        const converted = convertToMetric(effectiveQty, ing.unit);
+      const scaledQty = ing.quantity * scale;
+      let qtyText = formatQty(scaledQty);
+      let unitLabel = ing.unit?.abbreviation || ing.unit?.name || '';
+
+      if (unitSystem === 'metric') {
+        const converted = convertToMetric(scaledQty, ing.unit);
         if (converted) {
-          const qtyToken = scaledQty ?? String(ing.quantity);
-          displayText = displayText.replace(qtyToken, formatQty(converted.quantity));
-          const unitWord = ing.unit?.abbreviation || ing.unit?.name;
-          if (unitWord) {
-            const re = new RegExp(`\\b${escapeRegex(unitWord)}\\b`, 'i');
-            displayText = displayText.replace(re, converted.unitLabel);
-          }
+          qtyText = formatQty(converted.quantity);
+          unitLabel = converted.unitLabel;
         }
       }
-      return displayText;
+
+      return [qtyText, unitLabel, ing.food?.name ?? '', ing.note ? `(${ing.note})` : '']
+        .filter(Boolean).join(' ');
     });
   }, [recipe, scale, unitSystem]);
 
@@ -198,7 +194,11 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
     try {
       const data = await api.getRecipe(slug);
       setRecipe(data);
-      const base = parseServings(data.recipeYield);
+      // Matches Mealie's own scale-basis logic (RecipePageScale.vue): prefer
+      // recipeServings, fall back to recipeYieldQuantity. recipeYield (the
+      // freeform "8 jars, 0.5 pints each" text) is a display-only field and
+      // was never a servings count.
+      const base = data.recipeServings || data.recipeYieldQuantity || 1;
       setOriginalServings(base);
       setServings(base);
       setRating(data.rating ?? 0);
@@ -497,6 +497,10 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
     ? recipeImageSource(serverUrl, token, recipe.id, recipe.image)
     : null;
   const favorite = isFavorite(recipe.id);
+  // Hides the scaler when there's nothing it could actually change — showing
+  // it for a recipe with no structured ingredient quantities would just be a
+  // dead control, the exact "nothing happens" experience being fixed here.
+  const hasScalableIngredients = recipe.recipeIngredient.some(i => !i.disableAmount && i.quantity != null);
   const prepTimeDisplay = formatTimeText(recipe.prepTime);
   const cookTimeDisplay = displayCookTime(recipe);
   const totalTimeDisplay = formatTimeText(recipe.totalTime);
@@ -568,12 +572,13 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
         <View style={styles.content}>
           <Text style={styles.recipeName}>{recipe.name}</Text>
 
-          {(prepTimeDisplay || cookTimeDisplay || totalTimeDisplay || recipe.recipeYield) && (
+          {(prepTimeDisplay || cookTimeDisplay || totalTimeDisplay || recipe.recipeYield || recipe.recipeServings) && (
             <View style={styles.metaRow}>
               {prepTimeDisplay ? <MetaStat label="Prep" value={prepTimeDisplay} /> : null}
               {cookTimeDisplay ? <MetaStat label="Cook" value={cookTimeDisplay} /> : null}
               {totalTimeDisplay ? <MetaStat label="Total" value={totalTimeDisplay} /> : null}
-              {recipe.recipeYield ? <MetaStat label="Serves" value={recipe.recipeYield} /> : null}
+              {recipe.recipeYield ? <MetaStat label="Yield" value={recipe.recipeYield} /> : null}
+              {recipe.recipeServings ? <MetaStat label="Serves" value={formatQty(recipe.recipeServings)} /> : null}
             </View>
           )}
 
@@ -615,7 +620,7 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
           {activeTab === 'ingredients' && (
             <View style={styles.section}>
               <View style={styles.ingredientToolbar}>
-                {originalServings > 1 && (
+                {hasScalableIngredients && (
                   <View style={styles.scaler}>
                     <Text style={styles.scalerLabel}>Servings:</Text>
                     <TouchableOpacity
