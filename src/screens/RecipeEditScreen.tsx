@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Platform,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import { api } from '../lib/mealieApi';
+import { useAuth } from '../context/AuthContext';
+import { useRecipeMedia } from '../hooks/useRecipeMedia';
+import IngredientParseReviewModal, { formatIngredientPreview } from '../components/IngredientParseReviewModal';
+import { api, recipeAssetUrl, recipeImageSource } from '../lib/mealieApi';
 import { formatTimeText } from '../lib/timeEstimate';
 import { colors, radius, spacing, typography } from '../theme';
-import type { Recipe, RecipeTag, RecipeCategory } from '../types';
+import type { Recipe, RecipeIngredient, RecipeTag, RecipeCategory } from '../types';
 import type { RecipesStackParams } from '../navigation/RootNavigator';
 
 type Props = {
@@ -16,7 +19,12 @@ type Props = {
   route: RouteProp<RecipesStackParams, 'RecipeEdit'>;
 };
 
-type IngDraft = { key: string; text: string };
+// `parsed` is set once a row has gone through ingredient parsing and become
+// a real structured ingredient (quantity/unit/food) -- `text` becomes a
+// read-only preview at that point, since editing it in place would silently
+// invalidate the structure. Unparsed rows are plain freeform text, same as
+// this editor has always worked.
+type IngDraft = { key: string; text: string; parsed?: RecipeIngredient };
 type StepDraft = { key: string; title: string; text: string };
 type NoteDraft = { key: string; title: string; text: string };
 
@@ -38,9 +46,19 @@ function AddBtn({ label, onPress }: { label: string; onPress: () => void }) {
 
 export default function RecipeEditScreen({ navigation, route }: Props) {
   const { slug } = route.params;
+  const { serverUrl, token } = useAuth();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showParseModal, setShowParseModal] = useState(false);
+  const {
+    imageUploading, attachmentUploading, imgError, setImgError,
+    handlePickImage, handleAddAttachment,
+  } = useRecipeMedia(
+    slug,
+    image => setRecipe(prev => prev ? { ...prev, image } : prev),
+    asset => setRecipe(prev => prev ? { ...prev, assets: [...prev.assets, asset] } : prev),
+  );
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -72,15 +90,18 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         setTotalTime(formatTimeText(r.totalTime) ?? '');
         setSelectedTags(r.tags ?? []);
         setSelectedCategories(r.recipeCategory ?? []);
-        setIngredients(r.recipeIngredient.map((ing, i) => ({
-          key: `i${i}`,
-          text: ing.display ?? ing.originalText ?? [
-            ing.quantity ? String(ing.quantity) : '',
-            ing.unit?.abbreviation ?? ing.unit?.name ?? '',
-            ing.food?.name ?? '',
-            ing.note ?? '',
-          ].filter(Boolean).join(' '),
-        })));
+        setIngredients(r.recipeIngredient.map((ing, i) => {
+          // Preserve real structure on load -- flattening an already-
+          // structured ingredient (e.g. one created via Mealie's own web UI,
+          // or already parsed here before) down to plain text would silently
+          // discard its quantity/unit/food the moment this screen re-saves.
+          const isStructured = !ing.disableAmount && !!ing.quantity;
+          return {
+            key: `i${i}`,
+            text: isStructured ? formatIngredientPreview(ing) : (ing.display ?? ing.originalText ?? ing.note ?? ''),
+            parsed: isStructured ? ing : undefined,
+          };
+        }));
         setSteps(r.recipeInstructions.map((step, i) => ({
           key: `s${i}`,
           title: step.title ?? '',
@@ -97,12 +118,20 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         ]);
         setAvailableTags(tagData.items);
         setAvailableCategories(catData.items);
+
+        // Matches Mealie's own post-import behavior (its `?parse=true` query
+        // param after URL/image creation) -- offer the parse review
+        // immediately rather than making the user find the button.
+        if (route.params.autoParse && r.recipeIngredient.some(ing => (ing.display ?? ing.originalText ?? ing.note ?? '').trim())) {
+          setShowParseModal(true);
+        }
       })
       .catch(e => {
         Alert.alert('Could not load recipe', e instanceof Error ? e.message : 'Unknown error');
         navigation.goBack();
       })
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   const handleSave = async () => {
@@ -122,8 +151,8 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         tags: selectedTags,
         recipeCategory: selectedCategories,
         recipeIngredient: ingredients
-          .filter(i => i.text.trim())
-          .map(i => ({ note: i.text.trim(), originalText: i.text.trim(), disableAmount: true })),
+          .filter(i => i.parsed || i.text.trim())
+          .map(i => i.parsed ?? { note: i.text.trim(), originalText: i.text.trim(), disableAmount: true }),
         recipeInstructions: steps
           .filter(s => s.text.trim())
           .map(s => ({ title: s.title.trim() || undefined, text: s.text.trim() })),
@@ -173,6 +202,28 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Photo ───────────────────────────────────────── */}
+        <TouchableOpacity style={photoStyles.container} onPress={handlePickImage} disabled={imageUploading}>
+          {recipe?.image && serverUrl && !imgError ? (
+            <Image
+              source={recipeImageSource(serverUrl, token, recipe.id, recipe.image)}
+              style={photoStyles.image}
+              resizeMode="cover"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <View style={photoStyles.placeholder}>
+              <Text style={photoStyles.placeholderIcon}>📷</Text>
+              <Text style={photoStyles.placeholderText}>Add a photo</Text>
+            </View>
+          )}
+          {imageUploading && (
+            <View style={photoStyles.uploadOverlay}>
+              <ActivityIndicator color="#fff" size="large" />
+            </View>
+          )}
+        </TouchableOpacity>
+
         {/* ── Basic Info ──────────────────────────────────── */}
         <SectionLabel title="BASIC INFO" />
 
@@ -246,23 +297,41 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         </View>
 
         {/* ── Ingredients ─────────────────────────────────── */}
-        <SectionLabel title="INGREDIENTS" />
+        <View style={sectionStyles.headerRow}>
+          <SectionLabel title="INGREDIENTS" />
+          {ingredients.some(i => i.text.trim()) && (
+            <TouchableOpacity onPress={() => setShowParseModal(true)}>
+              <Text style={sectionStyles.addBtnText}>🪄 Parse Ingredients</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {ingredients.map((ing, idx) => (
           <View key={ing.key} style={styles.listRow}>
             <View style={styles.bulletCircle}>
               <Text style={styles.bulletText}>{idx + 1}</Text>
             </View>
-            <TextInput
-              style={[styles.input, styles.listInput]}
-              value={ing.text}
-              onChangeText={text =>
-                setIngredients(prev => prev.map(i => i.key === ing.key ? { ...i, text } : i))
-              }
-              placeholder="e.g. 2 cups all-purpose flour"
-              placeholderTextColor={colors.textDisabled}
-              multiline
-            />
+            {ing.parsed ? (
+              <View style={[styles.input, styles.listInput, styles.parsedRow]}>
+                <Text style={styles.parsedRowText}>{ing.text}</Text>
+                <TouchableOpacity
+                  onPress={() => setIngredients(prev => prev.map(i => i.key === ing.key ? { ...i, parsed: undefined } : i))}
+                >
+                  <Text style={styles.editAsTextLink}>Edit as text</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TextInput
+                style={[styles.input, styles.listInput]}
+                value={ing.text}
+                onChangeText={text =>
+                  setIngredients(prev => prev.map(i => i.key === ing.key ? { ...i, text } : i))
+                }
+                placeholder="e.g. 2 cups all-purpose flour"
+                placeholderTextColor={colors.textDisabled}
+                multiline
+              />
+            )}
             <TouchableOpacity
               style={styles.removeBtn}
               onPress={() => setIngredients(prev => prev.filter(i => i.key !== ing.key))}
@@ -417,8 +486,48 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
           onPress={() => setNotes(prev => [...prev, { key: uid(), title: '', text: '' }])}
         />
 
+        {/* ── Attachments ─────────────────────────────────── */}
+        <View style={sectionStyles.headerRow}>
+          <SectionLabel title="ATTACHMENTS" />
+          <TouchableOpacity onPress={handleAddAttachment} disabled={attachmentUploading}>
+            {attachmentUploading
+              ? <ActivityIndicator color={colors.primary} size="small" />
+              : <Text style={sectionStyles.addBtnText}>+ Add</Text>
+            }
+          </TouchableOpacity>
+        </View>
+        {recipe && recipe.assets.length > 0 ? recipe.assets.map((asset, i) => (
+          <TouchableOpacity
+            key={i}
+            style={styles.assetItem}
+            onPress={() => recipe && Linking.openURL(recipeAssetUrl(serverUrl, recipe.id, asset.fileName)).catch(() =>
+              Alert.alert('Cannot open', 'Could not open this file.')
+            )}
+          >
+            <Text style={styles.assetIcon}>📎</Text>
+            <Text style={styles.assetName} numberOfLines={1}>{asset.name || asset.fileName}</Text>
+            <Text style={styles.assetOpen}>Open ›</Text>
+          </TouchableOpacity>
+        )) : (
+          <Text style={styles.emptyText}>No attachments yet</Text>
+        )}
+
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
+
+      <IngredientParseReviewModal
+        visible={showParseModal}
+        ingredientLines={ingredients.map(i => i.text).filter(t => t.trim())}
+        onCancel={() => setShowParseModal(false)}
+        onComplete={result => {
+          setIngredients(result.map(ing => ({
+            key: uid(),
+            text: formatIngredientPreview(ing),
+            parsed: ing.disableAmount ? undefined : ing,
+          })));
+          setShowParseModal(false);
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -446,6 +555,49 @@ const sectionStyles = StyleSheet.create({
     fontSize: typography.size.sm,
     fontWeight: typography.weight.medium,
     color: colors.primary,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+});
+
+const photoStyles = StyleSheet.create({
+  container: {
+    width: '100%',
+    height: 180,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    marginTop: spacing.xs,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  placeholderIcon: {
+    fontSize: 32,
+  },
+  placeholderText: {
+    fontSize: typography.size.sm,
+    color: colors.textSecondary,
+    fontWeight: typography.weight.medium,
+  },
+  uploadOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
@@ -551,6 +703,22 @@ const styles = StyleSheet.create({
   listInput: {
     flex: 1,
   },
+  parsedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  parsedRowText: {
+    flex: 1,
+    fontSize: typography.size.md,
+    color: colors.textPrimary,
+  },
+  editAsTextLink: {
+    fontSize: typography.size.xs,
+    color: colors.primary,
+    fontWeight: typography.weight.medium,
+  },
   removeBtn: {
     width: 28,
     height: 28,
@@ -625,5 +793,34 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: colors.textInverse,
+  },
+  assetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  assetIcon: {
+    fontSize: 18,
+  },
+  assetName: {
+    flex: 1,
+    fontSize: typography.size.md,
+    color: colors.textPrimary,
+  },
+  assetOpen: {
+    fontSize: typography.size.sm,
+    color: colors.primary,
+    fontWeight: typography.weight.medium,
+  },
+  emptyText: {
+    color: colors.textDisabled,
+    fontSize: typography.size.md,
+    textAlign: 'center',
+    paddingVertical: spacing.md,
   },
 });

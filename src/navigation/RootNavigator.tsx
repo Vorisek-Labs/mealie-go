@@ -37,7 +37,7 @@ export type RecipesStackParams = {
   RecipesList: undefined;
   RecipeDetail: { slug: string; name: string };
   AddRecipe: undefined;
-  RecipeEdit: { slug: string; name: string };
+  RecipeEdit: { slug: string; name: string; autoParse?: boolean };
   RecipeSuggestions: undefined;
 };
 

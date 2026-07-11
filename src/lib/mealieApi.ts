@@ -5,7 +5,8 @@ import type {
   UserProfile, PaginatedResponse, RecipeSummary, Recipe,
   MealPlanEntry, CreateMealPlanEntry,
   ShoppingList, ShoppingListWithItems, ShoppingListItem,
-  Cookbook, CookbookInput, RecipeTag, RecipeCategory, RecipeTool, RecipeFood, RecipeComment, ShoppingLabel,
+  Cookbook, CookbookInput, RecipeTag, RecipeCategory, RecipeTool, RecipeUnit, RecipeFood,
+  CreateFoodInput, CreateUnitInput, ParsedIngredient, RecipeComment, ShoppingLabel,
   UserRatingSummary, RecipeShareToken, RecipeSuggestion,
 } from '../types';
 
@@ -239,8 +240,13 @@ export const api = {
   getRecipe: (slug: string) =>
     request<Recipe>(`/api/recipes/${slug}`),
 
+  // Current Mealie versions moved this from the old flat "/create-url" path
+  // to "/create/url" (grouped alongside the streaming and bulk URL-import
+  // variants) -- the old path now gets matched by the /recipes/{slug} route
+  // instead (treating "create-url" as a slug), which doesn't support POST,
+  // hence a 405 rather than a 404.
   createRecipeFromUrl: (url: string) =>
-    request<string>('/api/recipes/create-url', {
+    request<string>('/api/recipes/create/url', {
       method: 'POST',
       body: JSON.stringify({ url }),
     }),
@@ -377,8 +383,57 @@ export const api = {
   getTools: () =>
     request<PaginatedResponse<RecipeTool>>('/api/organizers/tools?perPage=200'),
 
-  getFoods: () =>
-    request<PaginatedResponse<RecipeFood>>('/api/foods?perPage=1000&orderBy=name&orderDirection=asc'),
+  getFoods: (search?: string) => {
+    const q = new URLSearchParams({ perPage: search ? '50' : '1000', orderBy: 'name', orderDirection: 'asc' });
+    if (search) q.set('search', search);
+    return request<PaginatedResponse<RecipeFood>>(`/api/foods?${q}`);
+  },
+
+  createFood: (data: CreateFoodInput) =>
+    request<RecipeFood>('/api/foods', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateFood: (id: string, data: RecipeFood) =>
+    request<RecipeFood>(`/api/foods/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  getUnits: (search?: string) => {
+    const q = new URLSearchParams({ perPage: search ? '50' : '200', orderBy: 'name', orderDirection: 'asc' });
+    if (search) q.set('search', search);
+    return request<PaginatedResponse<RecipeUnit>>(`/api/units?${q}`);
+  },
+
+  createUnit: (data: CreateUnitInput) =>
+    request<RecipeUnit>('/api/units', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateUnit: (id: string, data: RecipeUnit) =>
+    request<RecipeUnit>(`/api/units/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Turns freeform ingredient text into structured quantity/unit/food guesses
+  // with a confidence score per line. "nlp" is Mealie's own bundled parser —
+  // unlike AI image/URL features, this needs no external provider configured
+  // and works on any self-hosted server out of the box.
+  parseIngredients: (ingredients: string[], parser: 'nlp' | 'brute' = 'nlp') =>
+    request<ParsedIngredient[]>('/api/parser/ingredients', {
+      method: 'POST',
+      body: JSON.stringify({ parser, ingredients }),
+    }),
+
+  // Multipart image-to-recipe creation. Requires the server's group to have
+  // an AI provider configured (OpenAI-compatible) -- callers must catch and
+  // handle the "not enabled" error gracefully, this is not available on a
+  // default/unconfigured Mealie install.
+  createRecipeFromImages: (imageUris: string[], translateLanguage?: string) => {
+    const form = new FormData();
+    imageUris.forEach((uri, i) => {
+      const extension = extensionFromUri(uri);
+      form.append('images', {
+        uri,
+        name: `image_${i}.${extension}`,
+        type: mimeTypeForExtension(extension),
+      } as unknown as Blob);
+    });
+    const q = translateLanguage ? `?translateLanguage=${encodeURIComponent(translateLanguage)}` : '';
+    return requestMultipart<string>(`/api/recipes/create/image${q}`, 'POST', form);
+  },
 
   // Comments
   getComments: (slug: string) =>

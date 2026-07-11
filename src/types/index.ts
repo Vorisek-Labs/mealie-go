@@ -36,15 +36,46 @@ export interface RecipeTool {
   onHand?: boolean;
 }
 
+export interface FoodOrUnitAlias {
+  name: string;
+}
+
 export interface RecipeUnit {
   id?: string;
   name: string;
   abbreviation?: string;
+  aliases?: FoodOrUnitAlias[];
 }
 
 export interface RecipeFood {
   id?: string;
   name: string;
+  aliases?: FoodOrUnitAlias[];
+}
+
+// Minimal create payloads -- Mealie only requires `name` for either.
+export interface CreateFoodInput {
+  name: string;
+}
+
+export interface CreateUnitInput {
+  name: string;
+}
+
+export interface ParsedIngredientConfidence {
+  average?: number;
+  comment?: number;
+  name?: number;
+  unit?: number;
+  quantity?: number;
+  food?: number;
+}
+
+// Result of POST /api/parser/ingredients -- one per input ingredient line.
+export interface ParsedIngredient {
+  input: string;
+  confidence: ParsedIngredientConfidence;
+  ingredient: RecipeIngredient;
 }
 
 export interface RecipeSummary {

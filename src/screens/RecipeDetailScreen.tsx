@@ -5,12 +5,11 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
+import { useRecipeMedia } from '../hooks/useRecipeMedia';
 import { api, recipeAssetUrl, recipeImageSource } from '../lib/mealieApi';
 import CookModeModal from '../components/CookModeModal';
 import { displayCookTime, formatTimeText } from '../lib/timeEstimate';
@@ -113,9 +112,14 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('ingredients');
-  const [imgError, setImgError] = useState(false);
-  const [imageUploading, setImageUploading] = useState(false);
-  const [attachmentUploading, setAttachmentUploading] = useState(false);
+  const {
+    imageUploading, attachmentUploading, imgError, setImgError,
+    handlePickImage, handleAddAttachment,
+  } = useRecipeMedia(
+    slug,
+    image => setRecipe(prev => prev ? { ...prev, image } : prev),
+    asset => setRecipe(prev => prev ? { ...prev, assets: [...prev.assets, asset] } : prev),
+  );
   const [unitSystem, setUnitSystem] = useState<UnitSystemPreference>('original');
 
   const [servings, setServings] = useState(1);
@@ -340,60 +344,6 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
       setShareTokens(prev => prev.filter(t => t.id !== tokenId));
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Could not remove share link');
-    }
-  };
-
-  const handlePickImage = () => {
-    Alert.alert('Recipe Photo', 'Update this recipe\'s photo', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Take Photo', onPress: () => pickImage('camera') },
-      { text: 'Choose from Library', onPress: () => pickImage('library') },
-    ]);
-  };
-
-  const pickImage = async (source: 'camera' | 'library') => {
-    if (!recipe) return;
-    const permission = source === 'camera'
-      ? await ImagePicker.requestCameraPermissionsAsync()
-      : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission needed', `Allow access to your ${source === 'camera' ? 'camera' : 'photos'} to update this image.`);
-      return;
-    }
-
-    const result = source === 'camera'
-      ? await ImagePicker.launchCameraAsync({ quality: 0.8 })
-      : await ImagePicker.launchImageLibraryAsync({ quality: 0.8 });
-    if (result.canceled || !result.assets?.[0]) return;
-
-    setImageUploading(true);
-    try {
-      const { image } = await api.updateRecipeImage(slug, result.assets[0].uri);
-      setRecipe(prev => prev ? { ...prev, image } : prev);
-      setImgError(false);
-    } catch (e) {
-      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Could not update the recipe photo');
-    } finally {
-      setImageUploading(false);
-    }
-  };
-
-  const handleAddAttachment = async () => {
-    if (!recipe) return;
-    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
-    if (result.canceled || !result.assets?.[0]) return;
-
-    const picked = result.assets[0];
-    const baseName = picked.name.replace(/\.[^./\\]+$/, '') || 'attachment';
-
-    setAttachmentUploading(true);
-    try {
-      const asset = await api.uploadRecipeAsset(slug, picked.uri, baseName);
-      setRecipe(prev => prev ? { ...prev, assets: [...prev.assets, asset] } : prev);
-    } catch (e) {
-      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Could not add attachment');
-    } finally {
-      setAttachmentUploading(false);
     }
   };
 

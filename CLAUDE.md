@@ -205,7 +205,7 @@ Base URL: whatever the user entered on ConnectScreen.
 | GET | `/api/recipes` | `?page=1&perPage=50&search=&orderBy=name` — filters: repeatable `categories=`, `tags=`, `tools=` (slugs) and `foods=` (**UUIDs** — foods have no slug) |
 | GET | `/api/recipes/{slug}` | Full recipe with ingredients + instructions |
 | POST | `/api/recipes` | Body: `{ name }` → returns slug string |
-| POST | `/api/recipes/create-url` | Body: `{ url }` → returns slug string |
+| POST | `/api/recipes/create/url` | Body: `{ url }` → returns slug string. **Not** `/create-url` (the old path) — current Mealie versions moved this under `/create/url`, grouped with the streaming (`/create/url/stream`) and bulk (`/create/url/bulk`) variants; the old flat path now gets matched by `/recipes/{slug}` instead (treating "create-url" as a slug), which returns 405 since that route doesn't support POST. |
 | PUT | `/api/recipes/{slug}` | Full recipe body |
 | DELETE | `/api/recipes/{slug}` | |
 
@@ -787,6 +787,15 @@ All source files scaffolded and ready for `npm install + prebuild`:
   these silently drifted out of SDK compatibility mid-session and crashed the app.
 - expo-build-properties — added 2026-07-09, now the only supported way to set
   `android.usesCleartextTraffic` (see Gotcha in Build Commands; the bare app.json key stopped working)
+- expo-file-system — added 2026-07-11, **required by `expo-image-picker`'s camera capture on
+  Android even though it's not declared as a dependency in `expo-image-picker`'s own
+  `package.json`** (only `expo-image-loader` is). Without it, `launchCameraAsync` throws
+  `Module expo.modules.interfaces.filesystem.AppDirectories not found` at runtime — permission
+  grants fine, the camera app never opens. `npx expo install --check` does NOT catch this (it only
+  flags version drift on packages already installed, not missing undeclared dependencies). If
+  camera capture ever breaks again with this exact error, confirm `expo-file-system` is still in
+  `package.json` and a clean prebuild (`npx expo prebuild --platform android --clean`) has run
+  since.
 
 ### Known issues / TODO
 - No offline caching yet (Mealient had Room DB; we could add AsyncStorage caching later)
