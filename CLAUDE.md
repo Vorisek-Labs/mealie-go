@@ -296,6 +296,28 @@ empty filter string, same as the "no filter" default.
 | GET | `/api/users/self` | Returns UserProfile (includes `groupSlug`, used for share links) |
 | GET | `/api/auth/refresh` | Re-signs a **still-valid** token for a fresh one. Cannot recover an already-expired token — must be called proactively, not reactively on 401. `AuthContext` calls this every 6h and on app-foreground. |
 
+### Custom proxy headers — not a Mealie API, a reverse-proxy concern
+Added 2026-07-17 after user feedback: some self-hosted setups put Mealie behind a reverse proxy
+that gates access on its own header-based auth (Cloudflare Access's `CF-Access-Client-Id`/
+`CF-Access-Client-Secret`, Authelia, an Nginx config checking a shared API-key header, etc.) —
+without sending that header, every request gets blocked by the proxy before it ever reaches
+Mealie's own auth. `ConnectScreen` has a collapsed "Using a proxy header?" link (hidden by default
+so it doesn't clutter the common case) that expands to repeatable header name/value rows plus
+their own "remember or not" toggle, independent of the account's.
+
+Storage/plumbing lives in `mealieApi.ts`:
+- `getProxyHeaders()`/`saveProxyHeaders()` — the **active session's** headers, in
+  `expo-secure-store` (values can be secrets), read fresh by `request()`/`requestMultipart()`/
+  `login()` on every call and merged into the outgoing headers. Persists across app restarts like
+  the auth token does, cleared on logout by `clearCredentials()`.
+- `getSavedProxyHeadersForServer()`/`saveProxyHeadersForServer()`/`removeSavedProxyHeadersForServer()`
+  — a separate per-server-URL "remembered" copy (also SecureStore), offered back when that server
+  is picked from the Connect screen's saved-server dropdown. Independent of the account
+  remember-toggle — someone can remember the proxy header without remembering their password, or
+  vice versa.
+- `login()` sends these headers on the `/api/auth/token` call too, since the proxy sits in front of
+  that endpoint as well, not just authenticated requests.
+
 ### Unit system toggle & PDF export — no server API, done client-side
 Mealie's own server-side unit-conversion feature (`GET /api/recipes/{slug}/conversions`) was an
 **unmerged, unreleased PR** as of 2026-07 (targets `mealie-next`, not in any stable release) — do
@@ -465,6 +487,29 @@ At the end of every session, commit all changes AND update the Current Build Sta
 ## Current Build Status
 
 **Session (latest) — 2026-07-17**
+
+### Session 2026-07-17 (part 2) — custom proxy header support, v1.2.0 release
+User feedback from a Play Store reviewer/user asked for "a proxy header for security" — interpreted
+as: their Mealie server sits behind a reverse proxy (Cloudflare Access, Authelia, an API-key-gated
+Nginx config, etc.) that requires its own custom header before letting requests through to Mealie
+at all. See the new "Custom proxy headers" section above for the full technical detail.
+- **Added**: collapsed "Using a proxy header?" link on the Connect screen, expanding to repeatable
+  header name/value rows (value masked like a password) with their own independent "remember these
+  headers" toggle. Headers are sent on every request including sign-in.
+- This also closed a gap: the prior session (part below, "Add Create from Image...") had already
+  bumped `app.json` to `1.2.0`/versionCode `5` but never actually cut that release — folded this
+  feature into that same unreleased version rather than bumping again.
+- Built + installed release APK on device (`R5CN20KJXDL`), confirmed clean launch via logcat (no
+  FATAL/AndroidRuntime errors), user confirmed the Connect screen UI looks right and expands
+  cleanly. `npx tsc --noEmit` clean.
+- Shipped all three release surfaces per the standing checklist: pushed to
+  `Vorisek-Labs/mealie-go`, cut GitHub Release `v1.2.0` with the signed APK attached (verified via
+  `apksigner verify --print-certs`, not `jarsigner`), and built `app-release.aab` — **still needs
+  Ken to actually upload the AAB to Play Console**, that part is outside this repo.
+- **NEEDS DEVICE TESTING**: the actual round-trip against a real reverse-proxy-gated server —
+  nothing available in this session to test against. UI and normal (non-proxied) login flow are
+  confirmed working; whether the headers actually get a real proxy to let a request through has
+  not been verified end-to-end.
 
 ### Session 2026-07-17 — Play Store approved, links updated
 - **App approved and live on Google Play**: https://play.google.com/store/apps/details?id=com.voriseklabs.mealiego
