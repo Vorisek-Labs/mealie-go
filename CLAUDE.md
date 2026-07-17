@@ -464,7 +464,18 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 ## Current Build Status
 
-**Session (latest) — 2026-07-10**
+**Session (latest) — 2026-07-17**
+
+### Session 2026-07-17 — Play Store approved, links updated
+- **App approved and live on Google Play**: https://play.google.com/store/apps/details?id=com.voriseklabs.mealiego
+- Added a "Get it on Google Play" link to this repo's README, near the existing website link.
+- Updated `mealiego.voriseklabs.com` (nav, hero, footer) and the `voriseklabs.com` Apps section
+  (badge changed from "Closed Beta" to "On Google Play", CTA changed from a beta-request mailto
+  link to "Visit Mealie Go" + "Get it on Google Play") to reflect the live listing — both of those
+  sites live in `Vorisek-Labs/mealie-go-private` (website) and the separate main-site repo, not
+  here.
+
+### Session 2026-07-10
 
 ### Session 2026-07-10 (part 2) — open source release, Play Store prep, prep/cook time + Cook Mode, v1.1.0
 Large session covering going public, Play Store asset prep, and a new feature batch.

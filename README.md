@@ -8,6 +8,8 @@ Built with React Native + Expo. Android is the main target right now, iOS suppor
 
 Website: [mealiego.voriseklabs.com](https://mealiego.voriseklabs.com)
 
+[Get it on Google Play](https://play.google.com/store/apps/details?id=com.voriseklabs.mealiego)
+
 ## Features
 
 ### Recipes
