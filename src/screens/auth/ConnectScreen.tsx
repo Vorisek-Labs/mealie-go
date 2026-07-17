@@ -6,8 +6,9 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import {
   api, login, saveServerUrl, saveToken, saveAccount, removeAccount, getSavedAccounts,
+  saveProxyHeaders, getSavedProxyHeadersForServer, saveProxyHeadersForServer, removeSavedProxyHeadersForServer,
 } from '../../lib/mealieApi';
-import type { SavedAccount } from '../../lib/mealieApi';
+import type { SavedAccount, ProxyHeader } from '../../lib/mealieApi';
 import { colors, radius, spacing, typography } from '../../theme';
 
 export default function ConnectScreen() {
@@ -20,6 +21,9 @@ export default function ConnectScreen() {
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
   const [showServerDrop, setShowServerDrop] = useState(false);
   const [showUserDrop, setShowUserDrop] = useState(false);
+  const [showProxySection, setShowProxySection] = useState(false);
+  const [proxyHeaders, setProxyHeaders] = useState<ProxyHeader[]>([]);
+  const [rememberProxyHeaders, setRememberProxyHeaders] = useState(true);
   const usernameRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
@@ -43,6 +47,29 @@ export default function ConnectScreen() {
       setPassword('');
       setTimeout(() => usernameRef.current?.focus(), 100);
     }
+    getSavedProxyHeadersForServer(url).then(saved => {
+      if (saved.length > 0) {
+        setProxyHeaders(saved);
+        setRememberProxyHeaders(true);
+        setShowProxySection(true);
+      }
+    });
+  };
+
+  const addProxyHeader = () => setProxyHeaders(hs => [...hs, { name: '', value: '' }]);
+
+  const updateProxyHeader = (index: number, field: keyof ProxyHeader, value: string) =>
+    setProxyHeaders(hs => hs.map((h, i) => (i === index ? { ...h, [field]: value } : h)));
+
+  const removeProxyHeader = (index: number) =>
+    setProxyHeaders(hs => hs.filter((_, i) => i !== index));
+
+  const toggleProxySection = () => {
+    setShowProxySection(s => {
+      const next = !s;
+      if (next && proxyHeaders.length === 0) setProxyHeaders([{ name: '', value: '' }]);
+      return next;
+    });
   };
 
   const selectUsername = (user: string) => {
@@ -71,10 +98,12 @@ export default function ConnectScreen() {
       return;
     }
 
+    const activeProxyHeaders = proxyHeaders.filter(h => h.name.trim());
+
     setLoading(true);
     try {
-      const token = await login(url, user, pass);
-      await Promise.all([saveServerUrl(url), saveToken(token)]);
+      const token = await login(url, user, pass, activeProxyHeaders);
+      await Promise.all([saveServerUrl(url), saveToken(token), saveProxyHeaders(activeProxyHeaders)]);
       const profile = await api.getSelf();
       if (remember) {
         await saveAccount({ serverUrl: url, username: user, password: pass });
@@ -83,6 +112,11 @@ export default function ConnectScreen() {
         // turning "remember" off now should actually forget it, not just
         // skip re-saving it.
         await removeAccount(url, user);
+      }
+      if (rememberProxyHeaders && activeProxyHeaders.length > 0) {
+        await saveProxyHeadersForServer(url, activeProxyHeaders);
+      } else {
+        await removeSavedProxyHeadersForServer(url);
       }
       await signIn(url, token, profile);
     } catch (e) {
@@ -211,6 +245,69 @@ export default function ConnectScreen() {
               onSubmitEditing={handleConnect}
             />
           </View>
+
+          <TouchableOpacity
+            style={styles.proxyToggleRow}
+            onPress={toggleProxySection}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.proxyToggleText}>
+              {showProxySection ? '▾' : '▸'} Using a proxy header?
+            </Text>
+          </TouchableOpacity>
+
+          {showProxySection && (
+            <View style={styles.proxySection}>
+              <Text style={styles.proxyHint}>
+                For servers behind Cloudflare Access, Authelia, or an API-key reverse proxy —
+                these headers are sent with every request, including sign-in.
+              </Text>
+              {proxyHeaders.map((h, i) => (
+                <View key={i} style={styles.proxyRow}>
+                  <TextInput
+                    style={[styles.proxyInput, styles.proxyNameInput]}
+                    placeholder="Header name"
+                    placeholderTextColor={colors.textDisabled}
+                    value={h.name}
+                    onChangeText={v => updateProxyHeader(i, 'name', v)}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TextInput
+                    style={[styles.proxyInput, styles.proxyValueInput]}
+                    placeholder="Header value"
+                    placeholderTextColor={colors.textDisabled}
+                    value={h.value}
+                    onChangeText={v => updateProxyHeader(i, 'value', v)}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    secureTextEntry
+                  />
+                  <TouchableOpacity style={styles.proxyRemove} onPress={() => removeProxyHeader(i)}>
+                    <Text style={styles.proxyRemoveText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              <TouchableOpacity style={styles.proxyAddButton} onPress={addProxyHeader}>
+                <Text style={styles.proxyAddText}>+ Add header</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.rememberRow}
+                onPress={() => setRememberProxyHeaders(r => !r)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.rememberLabel}>Remember these headers</Text>
+                <Switch
+                  value={rememberProxyHeaders}
+                  onValueChange={setRememberProxyHeaders}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={colors.textPrimary}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
 
           <TouchableOpacity
             style={styles.rememberRow}
@@ -343,6 +440,63 @@ const styles = StyleSheet.create({
   dropItemText: {
     fontSize: typography.size.md,
     color: colors.textPrimary,
+  },
+  proxyToggleRow: {
+    paddingVertical: spacing.xs,
+  },
+  proxyToggleText: {
+    fontSize: typography.size.sm,
+    color: colors.textSecondary,
+    fontWeight: typography.weight.medium,
+  },
+  proxySection: {
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  proxyHint: {
+    fontSize: typography.size.xs,
+    color: colors.textDisabled,
+    lineHeight: typography.size.xs * 1.5,
+  },
+  proxyRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  proxyInput: {
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    fontSize: typography.size.sm,
+    color: colors.textPrimary,
+  },
+  proxyNameInput: {
+    flex: 1,
+  },
+  proxyValueInput: {
+    flex: 1.3,
+  },
+  proxyRemove: {
+    padding: spacing.xs,
+  },
+  proxyRemoveText: {
+    fontSize: typography.size.md,
+    color: colors.textDisabled,
+  },
+  proxyAddButton: {
+    alignSelf: 'flex-start',
+  },
+  proxyAddText: {
+    fontSize: typography.size.sm,
+    color: colors.primary,
+    fontWeight: typography.weight.medium,
   },
   rememberRow: {
     flexDirection: 'row',

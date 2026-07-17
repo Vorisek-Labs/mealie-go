@@ -13,11 +13,78 @@ import type {
 const SERVER_URL_KEY = 'mealie_go.server_url';
 const TOKEN_KEY = 'mealie_go.auth_token';
 const SAVED_ACCOUNTS_KEY = 'mealie_go.saved_accounts';
+const PROXY_HEADERS_KEY = 'mealie_go.proxy_headers';
+const SAVED_PROXY_HEADERS_KEY = 'mealie_go.saved_proxy_headers';
 
 export interface SavedAccount {
   serverUrl: string;
   username: string;
   password: string;
+}
+
+// Custom headers some self-hosted setups require just to reach Mealie at all —
+// e.g. a reverse proxy in front of the server gating access with an API key
+// header, or Cloudflare Access's CF-Access-Client-Id/Secret pair. Header
+// *values* can be secrets (an Access service token, a shared API key), so
+// both the active-session copy and the per-server "remembered" copy live in
+// expo-secure-store, same reasoning as SavedAccount passwords above.
+export interface ProxyHeader {
+  name: string;
+  value: string;
+}
+
+function headersToRecord(headers: ProxyHeader[]): Record<string, string> {
+  const record: Record<string, string> = {};
+  for (const h of headers) {
+    if (h.name.trim()) record[h.name.trim()] = h.value;
+  }
+  return record;
+}
+
+// Active for the current signed-in session — read fresh on every request,
+// independent of the "remember" toggle below (mirrors how the auth token
+// itself always persists across app restarts regardless of that toggle).
+export async function getProxyHeaders(): Promise<ProxyHeader[]> {
+  const raw = await SecureStore.getItemAsync(PROXY_HEADERS_KEY);
+  return raw ? (JSON.parse(raw) as ProxyHeader[]) : [];
+}
+
+export async function saveProxyHeaders(headers: ProxyHeader[]): Promise<void> {
+  if (headers.length === 0) {
+    await SecureStore.deleteItemAsync(PROXY_HEADERS_KEY);
+    return;
+  }
+  await SecureStore.setItemAsync(PROXY_HEADERS_KEY, JSON.stringify(headers));
+}
+
+async function getSavedProxyHeadersMap(): Promise<Record<string, ProxyHeader[]>> {
+  const raw = await SecureStore.getItemAsync(SAVED_PROXY_HEADERS_KEY);
+  return raw ? (JSON.parse(raw) as Record<string, ProxyHeader[]>) : {};
+}
+
+// Per-server remembered headers, offered back next time that server URL is
+// picked from the Connect screen's dropdown — same "remember or not" choice
+// as saved account passwords, just keyed by server instead of by account.
+export async function getSavedProxyHeadersForServer(serverUrl: string): Promise<ProxyHeader[]> {
+  const map = await getSavedProxyHeadersMap();
+  return map[serverUrl] ?? [];
+}
+
+export async function saveProxyHeadersForServer(serverUrl: string, headers: ProxyHeader[]): Promise<void> {
+  const map = await getSavedProxyHeadersMap();
+  if (headers.length === 0) {
+    delete map[serverUrl];
+  } else {
+    map[serverUrl] = headers;
+  }
+  await SecureStore.setItemAsync(SAVED_PROXY_HEADERS_KEY, JSON.stringify(map));
+}
+
+export async function removeSavedProxyHeadersForServer(serverUrl: string): Promise<void> {
+  const map = await getSavedProxyHeadersMap();
+  if (!(serverUrl in map)) return;
+  delete map[serverUrl];
+  await SecureStore.setItemAsync(SAVED_PROXY_HEADERS_KEY, JSON.stringify(map));
 }
 
 // Saved accounts include plaintext passwords (so the login form can
@@ -75,13 +142,17 @@ export async function saveToken(token: string): Promise<void> {
 export async function clearCredentials(): Promise<void> {
   await AsyncStorage.removeItem(SERVER_URL_KEY);
   await SecureStore.deleteItemAsync(TOKEN_KEY);
+  // Session-only — the per-server "remembered" copy (if any) intentionally
+  // survives logout, same as saved accounts do.
+  await SecureStore.deleteItemAsync(PROXY_HEADERS_KEY);
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const [serverUrl, token] = await Promise.all([getServerUrl(), getToken()]);
+  const [serverUrl, token, proxyHeaders] = await Promise.all([getServerUrl(), getToken(), getProxyHeaders()]);
   const res = await fetch(`${serverUrl}${path}`, {
     ...options,
     headers: {
+      ...headersToRecord(proxyHeaders),
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
       ...(options.headers as Record<string, string>),
@@ -99,10 +170,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 // Multipart uploads must NOT set a Content-Type header — fetch derives the
 // multipart/form-data boundary itself from the FormData body.
 async function requestMultipart<T>(path: string, method: string, form: FormData): Promise<T> {
-  const [serverUrl, token] = await Promise.all([getServerUrl(), getToken()]);
+  const [serverUrl, token, proxyHeaders] = await Promise.all([getServerUrl(), getToken(), getProxyHeaders()]);
   const res = await fetch(`${serverUrl}${path}`, {
     method,
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { ...headersToRecord(proxyHeaders), Authorization: `Bearer ${token}` },
     body: form,
   });
   if (res.status === 401) throw new Error('UNAUTHORIZED');
@@ -161,12 +232,17 @@ function buildRecipeQuery(params?: RecipeQueryParams): URLSearchParams {
   return q;
 }
 
-export async function login(serverUrl: string, username: string, password: string): Promise<string> {
+export async function login(
+  serverUrl: string, username: string, password: string, proxyHeaders: ProxyHeader[] = []
+): Promise<string> {
   const base = serverUrl.replace(/\/$/, '');
   const body = new URLSearchParams({ username, password, remember_me: 'false' });
   const res = await fetch(`${base}/api/auth/token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      ...headersToRecord(proxyHeaders),
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
     body: body.toString(),
   });
   if (!res.ok) {
