@@ -8,7 +8,7 @@ Built with React Native + Expo. Android is the main target right now, iOS suppor
 
 Website: [mealiego.voriseklabs.com](https://mealiego.voriseklabs.com)
 
-[Get it on Google Play](https://play.google.com/store/apps/details?id=com.voriseklabs.mealiego)
+[<img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="64">](https://play.google.com/store/apps/details?id=com.voriseklabs.mealiego)
 
 ## Features
 
