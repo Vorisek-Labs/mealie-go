@@ -81,6 +81,11 @@ MealieGo/
 └── src/
     ├── theme/
     │   └── index.ts               ← herb green palette, all color/spacing/typography tokens
+    ├── i18n/
+    │   ├── index.ts               ← i18next setup: initI18n(), setLanguage(), SUPPORTED_LANGUAGES, RTL_LANGUAGES
+    │   └── locales/*.json         ← per-language strings, en.json is the source of truth for keys; only
+    │                                 ConnectScreen + SettingsScreen migrated so far (added 2026-07-18) — most
+    │                                 screens still use hardcoded English strings, see Localization section below
     ├── types/
     │   └── index.ts               ← all TypeScript interfaces (Recipe, MealPlan, Shopping, etc.)
     ├── lib/
@@ -335,6 +340,40 @@ covers the OIDC provider's own domain (not just Mealie's) won't be honored past 
 **Not yet verified against a real OIDC-configured Mealie server** — none was available this session.
 If SSO login is reported broken, this whole section is the first place to check.
 
+### Localization (i18n) — in progress, not a Mealie API
+Added 2026-07-18 after user feedback ("we need language support!"). This app's UI has ~15 screens
+and 500+ hardcoded English strings — translating everything in one pass wasn't realistic, so this
+shipped as an infrastructure-plus-pilot: the underlying i18n setup is done and works, but only
+`ConnectScreen` and `SettingsScreen` have had their strings actually extracted. Every other screen
+still has raw English `<Text>` literals — **this is the expected state, not a bug**, until each
+remaining screen gets migrated the same way.
+
+- `src/i18n/index.ts` — `initI18n()` (call once at startup, before anything using
+  `useTranslation()` renders — `App.tsx` gates its first render on this), `setLanguage()`,
+  `SUPPORTED_LANGUAGES`, `RTL_LANGUAGES`. Uses `i18next` + `react-i18next`; device locale detected
+  via `expo-localization`, manual override persisted in AsyncStorage (`mealie_go.language`) and
+  takes priority over the device locale on next launch.
+- **`initI18n()` must never reject** — `App.tsx`'s entire first render is gated on this promise
+  settling, so a rejection would mean a permanent blank screen for every user, not just a missing
+  translation. Every internal step (AsyncStorage read, `Localization.getLocales()`, `i18next.init`)
+  is individually try/caught with an English fallback, plus a defensive `.catch()` at the call site
+  in `App.tsx` as a second line of defense. Keep this property if you touch this file.
+- 10 languages as of this writing: English (baseline/source of truth for keys), Chinese
+  (Simplified), Hindi, Spanish, French, Arabic, Bengali, Russian, Portuguese, Urdu — chosen as "top
+  10 world languages by total speakers" per Ken's request, not by this app's actual userbase. **All
+  9 non-English files are AI-translated, not yet reviewed by a native speaker of each language** —
+  treat as a reasonable starting point, not verified-correct copy. If a user reports a translation
+  is wrong or awkward, that's expected until someone fluent reviews it.
+- **Arabic and Urdu are RTL languages, and only their text content is translated so far** — actual
+  right-to-left layout mirroring (`I18nManager.forceRTL()`) is not implemented. RN requires an app
+  restart for an RTL flip to visually take effect (it can't be applied to an already-mounted tree),
+  which will need its own dedicated implementation + testing pass, not a small add-on.
+- To migrate another screen: add its keys to `src/i18n/locales/en.json` under a new top-level
+  namespace (e.g. `"recipes": {...}`, matching the `"connect"`/`"settings"` pattern already there),
+  add the same keys to all 9 other locale files, then swap the screen's hardcoded strings for
+  `t('namespace.key')` via `useTranslation()`. Do this screen-by-screen, not as one giant sweep —
+  it's much easier to review and verify a handful of screens at a time than the whole app at once.
+
 ### Custom proxy headers — not a Mealie API, a reverse-proxy concern
 Added 2026-07-17 after user feedback: some self-hosted setups put Mealie behind a reverse proxy
 that gates access on its own header-based auth (Cloudflare Access's `CF-Access-Client-Id`/
@@ -562,15 +601,28 @@ servers) previously meant the app couldn't log in at all, silently.
   build succeeded, `react-native-webview` linked without error. If SSO login is reported broken,
   start with the SSO section in the API Reference above.
 
-**Still open**: a user also asked for "language support" — ambiguous between translating the
-app's own UI (large effort: ~500+ strings across ~15 screens, needs an i18n library +
-device-locale detection + a language list) and expanding recipe/import-time language handling
-(smaller — there's already a `translateLanguage` param on image-import). Ken said both are wanted;
-blocked on knowing which languages to prioritize before starting the UI-translation half — not
-started yet.
+**v1.3.1 (i18n foundation — pilot, not complete):**
+See the new Localization (i18n) section in the API Reference above. Ken asked for "language
+support," ambiguous between UI translation and recipe/import-time language handling (there's
+already a `translateLanguage` param on image-import for the latter) — he wants both, and for the
+UI half, picked "top 10 most common languages" when asked to prioritize.
+- Given ~500+ strings across ~15 screens is not a same-session task, shipped as infrastructure +
+  a 2-screen proof of concept (ConnectScreen, SettingsScreen) rather than attempting the whole app
+  blind. New dependencies: `i18next`, `react-i18next`, `expo-localization`.
+- **`App.tsx` now gates its very first render on `initI18n()`** — the highest-stakes change of this
+  session, since it affects every app launch for every user, not just new logins or a single
+  screen. Hardened so it can never reject/hang (see the Localization section above) after
+  realizing the initial version had no `.catch()` at the call site.
+- **Remaining ~13 screens still need migrating** — this is the clear next step for continuing this
+  feature, screen-by-screen (see the "how to migrate another screen" note in the Localization
+  section above), not a giant one-shot sweep.
+- **NOT verified live** — no device was connected this session; Ken accepted the risk again and
+  verifies via Play Store update. `npx expo install --check` clean, Gradle build succeeded,
+  `expo-localization` linked without error.
 
-Both releases: `npx tsc --noEmit` clean throughout. Shipped all three surfaces each time (GitHub
-repo pushed, GitHub Release with signed APK cut and verified via `apksigner verify --print-certs`,
+All three releases this session: `npx tsc --noEmit` clean throughout. Shipped all three surfaces
+each time (GitHub repo pushed, GitHub Release with signed APK cut and verified via `apksigner
+verify --print-certs`,
 AAB built) — Ken uploads the AAB to Play Console himself.
 
 ### Session 2026-07-17 (part 3) — self-healing retry for POST-downgraded-to-GET on redirect, v1.2.1
@@ -981,6 +1033,9 @@ All source files scaffolded and ready for `npm install + prebuild`:
   login section above). Installed via `npx expo install`; linked and built cleanly (`npx expo
   install --check` clean, Gradle build succeeded) but **not exercised on a physical device** this
   session — no device was connected when this shipped.
+- i18next, react-i18next, expo-localization — added 2026-07-18 for the Localization (i18n) feature
+  above. Same as react-native-webview: linked and built cleanly, `npx expo install --check` clean,
+  but not exercised on a physical device this session.
 
 ### Known issues / TODO
 - No offline caching yet (Mealient had Room DB; we could add AsyncStorage caching later)
