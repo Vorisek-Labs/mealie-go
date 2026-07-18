@@ -2,16 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Constants from 'expo-constants';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { getUnitSystemPreference, setUnitSystemPreference } from '../lib/unitConversion';
 import type { UnitSystemPreference } from '../lib/unitConversion';
 import { navigateToGuide } from '../navigation/navigateToGuide';
+import { SUPPORTED_LANGUAGES, setLanguage } from '../i18n';
+import type { LanguageCode } from '../i18n';
 import { colors, radius, spacing, typography } from '../theme';
 
 export default function SettingsScreen() {
+  const { t, i18n } = useTranslation();
   const { user, serverUrl, logout } = useAuth();
   const navigation = useNavigation();
   const [unitSystem, setUnitSystem] = useState<UnitSystemPreference>('original');
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
 
   useEffect(() => { getUnitSystemPreference().then(setUnitSystem); }, []);
 
@@ -20,48 +25,56 @@ export default function SettingsScreen() {
     await setUnitSystemPreference(pref);
   };
 
+  const chooseLanguage = async (code: LanguageCode) => {
+    setShowLanguagePicker(false);
+    await setLanguage(code);
+  };
+
+  const currentLanguageLabel = SUPPORTED_LANGUAGES.find(l => l.code === i18n.language)?.label
+    ?? SUPPORTED_LANGUAGES[0].label;
+
   const handleLogout = () => {
-    Alert.alert('Sign out', 'Disconnect from this Mealie server?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: logout },
+    Alert.alert(t('settings.signOutTitle'), t('settings.signOutConfirm'), [
+      { text: t('settings.cancel'), style: 'cancel' },
+      { text: t('settings.signOut'), style: 'destructive', onPress: logout },
     ]);
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.pageTitle}>Settings</Text>
+      <Text style={styles.pageTitle}>{t('settings.title')}</Text>
 
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Account</Text>
+        <Text style={styles.sectionLabel}>{t('settings.account')}</Text>
         <View style={styles.card}>
-          <Row label="Username" value={user?.username ?? '—'} />
-          {user?.fullName ? <Row label="Name" value={user.fullName} /> : null}
-          {user?.email ? <Row label="Email" value={user.email} /> : null}
-          {user?.admin ? <Row label="Role" value="Admin" /> : null}
+          <Row label={t('settings.username')} value={user?.username ?? '—'} />
+          {user?.fullName ? <Row label={t('settings.name')} value={user.fullName} /> : null}
+          {user?.email ? <Row label={t('settings.email')} value={user.email} /> : null}
+          {user?.admin ? <Row label={t('settings.role')} value={t('settings.admin')} /> : null}
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Server</Text>
+        <Text style={styles.sectionLabel}>{t('settings.server')}</Text>
         <View style={styles.card}>
-          <Row label="URL" value={serverUrl || '—'} mono />
-          {user?.group ? <Row label="Group" value={user.group} /> : null}
-          {user?.household ? <Row label="Household" value={user.household} /> : null}
+          <Row label={t('settings.url')} value={serverUrl || '—'} mono />
+          {user?.group ? <Row label={t('settings.group')} value={user.group} /> : null}
+          {user?.household ? <Row label={t('settings.household')} value={user.household} /> : null}
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Preferences</Text>
+        <Text style={styles.sectionLabel}>{t('settings.preferences')}</Text>
         <View style={styles.card}>
           <View style={styles.prefRow}>
-            <Text style={styles.prefLabel}>Ingredient Units</Text>
+            <Text style={styles.prefLabel}>{t('settings.ingredientUnits')}</Text>
             <View style={styles.segmented}>
               <TouchableOpacity
                 style={[styles.segment, unitSystem === 'original' && styles.segmentActive]}
                 onPress={() => chooseUnitSystem('original')}
               >
                 <Text style={[styles.segmentText, unitSystem === 'original' && styles.segmentTextActive]}>
-                  As Written
+                  {t('settings.asWritten')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -69,33 +82,53 @@ export default function SettingsScreen() {
                 onPress={() => chooseUnitSystem('metric')}
               >
                 <Text style={[styles.segmentText, unitSystem === 'metric' && styles.segmentTextActive]}>
-                  Metric
+                  {t('settings.metric')}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
+          <TouchableOpacity style={styles.prefRow} onPress={() => setShowLanguagePicker(v => !v)}>
+            <Text style={styles.prefLabel}>{t('settings.language')}</Text>
+            <Text style={styles.languageValue}>{currentLanguageLabel} ›</Text>
+          </TouchableOpacity>
+          {showLanguagePicker && (
+            <View style={styles.languageList}>
+              {SUPPORTED_LANGUAGES.map(lang => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={styles.languageRow}
+                  onPress={() => chooseLanguage(lang.code)}
+                >
+                  <Text style={[styles.languageRowText, lang.code === i18n.language && styles.languageRowTextActive]}>
+                    {lang.label}
+                  </Text>
+                  {lang.code === i18n.language ? <Text style={styles.languageCheck}>✓</Text> : null}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Help</Text>
+        <Text style={styles.sectionLabel}>{t('settings.help')}</Text>
         <TouchableOpacity style={styles.card} onPress={() => navigateToGuide(navigation)}>
           <View style={styles.guideRow}>
-            <Text style={styles.guideText}>How to Use Mealie Go</Text>
+            <Text style={styles.guideText}>{t('settings.guideLink')}</Text>
             <Text style={styles.chevron}>›</Text>
           </View>
         </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>App</Text>
+        <Text style={styles.sectionLabel}>{t('settings.app')}</Text>
         <View style={styles.card}>
-          <Row label="Version" value={Constants.expoConfig?.version ?? '1.0.0'} />
+          <Row label={t('settings.version')} value={Constants.expoConfig?.version ?? '1.0.0'} />
         </View>
       </View>
 
       <TouchableOpacity style={styles.signOutButton} onPress={handleLogout}>
-        <Text style={styles.signOutText}>Sign Out</Text>
+        <Text style={styles.signOutText}>{t('settings.signOut')}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -151,6 +184,15 @@ const styles = StyleSheet.create({
   segmentActive: { backgroundColor: colors.primary },
   segmentText: { fontSize: typography.size.xs, fontWeight: typography.weight.medium, color: colors.textSecondary },
   segmentTextActive: { color: colors.textInverse },
+  languageValue: { fontSize: typography.size.md, color: colors.textSecondary },
+  languageList: { paddingBottom: spacing.sm },
+  languageRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: spacing.sm, paddingHorizontal: spacing.xs,
+  },
+  languageRowText: { fontSize: typography.size.md, color: colors.textSecondary },
+  languageRowTextActive: { color: colors.textPrimary, fontWeight: typography.weight.semibold },
+  languageCheck: { color: colors.primary, fontSize: typography.size.md },
   guideRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: spacing.sm + 2,

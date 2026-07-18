@@ -3,6 +3,7 @@ import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
   ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import {
   api, login, saveServerUrl, saveToken, saveAccount, removeAccount, getSavedAccounts,
@@ -14,6 +15,7 @@ import OidcLoginModal from '../../components/OidcLoginModal';
 import { colors, radius, spacing, typography } from '../../theme';
 
 export default function ConnectScreen() {
+  const { t } = useTranslation();
   const { signIn } = useAuth();
   const [serverUrl, setServerUrl] = useState('');
   const [username, setUsername] = useState('');
@@ -111,11 +113,11 @@ export default function ConnectScreen() {
     const pass = password;
 
     if (!url || !user || !pass) {
-      Alert.alert('Missing fields', 'Please fill in all three fields.');
+      Alert.alert(t('connect.missingFieldsTitle'), t('connect.missingFieldsMsg'));
       return;
     }
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      Alert.alert('Invalid URL', 'Server URL must start with http:// or https://');
+      Alert.alert(t('connect.invalidUrlTitle'), t('connect.invalidUrlMsg'));
       return;
     }
 
@@ -143,7 +145,7 @@ export default function ConnectScreen() {
       }
       await signIn(resolvedUrl, token, profile);
     } catch (e) {
-      Alert.alert('Connection failed', e instanceof Error ? e.message : 'Could not connect to server.');
+      Alert.alert(t('connect.connectionFailedTitle'), e instanceof Error ? e.message : t('connect.genericConnectError'));
     } finally {
       setLoading(false);
     }
@@ -168,7 +170,7 @@ export default function ConnectScreen() {
       }
       await signIn(url, token, profile);
     } catch (e) {
-      Alert.alert('Connection failed', e instanceof Error ? e.message : 'Could not complete sign-in.');
+      Alert.alert(t('connect.connectionFailedTitle'), e instanceof Error ? e.message : t('connect.genericSignInError'));
     } finally {
       setLoading(false);
     }
@@ -188,18 +190,18 @@ export default function ConnectScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.logo}>🥘</Text>
-          <Text style={styles.title}>Mealie Go</Text>
-          <Text style={styles.subtitle}>Connect to your Mealie server</Text>
+          <Text style={styles.title}>{t('connect.title')}</Text>
+          <Text style={styles.subtitle}>{t('connect.subtitle')}</Text>
         </View>
 
         <View style={styles.form}>
           {/* Server URL */}
           <View style={styles.field}>
-            <Text style={styles.label}>Server URL</Text>
+            <Text style={styles.label}>{t('connect.serverUrlLabel')}</Text>
             <View style={styles.inputRow}>
               <TextInput
                 style={styles.input}
-                placeholder="http://192.168.1.x:9925"
+                placeholder={t('connect.serverUrlPlaceholder')}
                 placeholderTextColor={colors.textDisabled}
                 value={serverUrl}
                 onChangeText={v => { setServerUrl(v); setShowServerDrop(false); setAppInfo(null); }}
@@ -242,12 +244,12 @@ export default function ConnectScreen() {
           {appInfo?.allowPasswordLogin !== false && (
             <>
               <View style={styles.field}>
-                <Text style={styles.label}>Username</Text>
+                <Text style={styles.label}>{t('connect.usernameLabel')}</Text>
                 <View style={styles.inputRow}>
                   <TextInput
                     ref={usernameRef}
                     style={styles.input}
-                    placeholder="your username"
+                    placeholder={t('connect.usernamePlaceholder')}
                     placeholderTextColor={colors.textDisabled}
                     value={username}
                     onChangeText={v => { setUsername(v); setShowUserDrop(false); }}
@@ -283,11 +285,11 @@ export default function ConnectScreen() {
               </View>
 
               <View style={styles.field}>
-                <Text style={styles.label}>Password</Text>
+                <Text style={styles.label}>{t('connect.passwordLabel')}</Text>
                 <TextInput
                   ref={passwordRef}
                   style={styles.inputFull}
-                  placeholder="your password"
+                  placeholder={t('connect.passwordPlaceholder')}
                   placeholderTextColor={colors.textDisabled}
                   value={password}
                   onChangeText={setPassword}
@@ -306,7 +308,7 @@ export default function ConnectScreen() {
               onPress={() => setShowOidcModal(true)}
               disabled={loading}
             >
-              <Text style={styles.oidcButtonText}>Log in with {appInfo.oidcProviderName || 'SSO'}</Text>
+              <Text style={styles.oidcButtonText}>{t('connect.oidcButton', { provider: appInfo.oidcProviderName || 'SSO' })}</Text>
             </TouchableOpacity>
           )}
 
@@ -316,21 +318,20 @@ export default function ConnectScreen() {
             activeOpacity={0.7}
           >
             <Text style={styles.proxyToggleText}>
-              {showProxySection ? '▾' : '▸'} Using a proxy header?
+              {showProxySection ? '▾' : '▸'} {t('connect.proxyToggle')}
             </Text>
           </TouchableOpacity>
 
           {showProxySection && (
             <View style={styles.proxySection}>
               <Text style={styles.proxyHint}>
-                For servers behind Cloudflare Access, Authelia, or an API-key reverse proxy —
-                these headers are sent with every request, including sign-in.
+                {t('connect.proxyHint')}
               </Text>
               {proxyHeaders.map((h, i) => (
                 <View key={i} style={styles.proxyRow}>
                   <TextInput
                     style={[styles.proxyInput, styles.proxyNameInput]}
-                    placeholder="Header name"
+                    placeholder={t('connect.proxyHeaderNamePlaceholder')}
                     placeholderTextColor={colors.textDisabled}
                     value={h.name}
                     onChangeText={v => updateProxyHeader(i, 'name', v)}
@@ -339,7 +340,7 @@ export default function ConnectScreen() {
                   />
                   <TextInput
                     style={[styles.proxyInput, styles.proxyValueInput]}
-                    placeholder="Header value"
+                    placeholder={t('connect.proxyHeaderValuePlaceholder')}
                     placeholderTextColor={colors.textDisabled}
                     value={h.value}
                     onChangeText={v => updateProxyHeader(i, 'value', v)}
@@ -354,7 +355,7 @@ export default function ConnectScreen() {
               ))}
 
               <TouchableOpacity style={styles.proxyAddButton} onPress={addProxyHeader}>
-                <Text style={styles.proxyAddText}>+ Add header</Text>
+                <Text style={styles.proxyAddText}>{t('connect.addHeader')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -362,7 +363,7 @@ export default function ConnectScreen() {
                 onPress={() => setRememberProxyHeaders(r => !r)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.rememberLabel}>Remember these headers</Text>
+                <Text style={styles.rememberLabel}>{t('connect.rememberHeaders')}</Text>
                 <Switch
                   value={rememberProxyHeaders}
                   onValueChange={setRememberProxyHeaders}
@@ -380,7 +381,7 @@ export default function ConnectScreen() {
                 onPress={() => setRemember(r => !r)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.rememberLabel}>Remember this account</Text>
+                <Text style={styles.rememberLabel}>{t('connect.rememberAccount')}</Text>
                 <Switch
                   value={remember}
                   onValueChange={setRemember}
@@ -396,7 +397,7 @@ export default function ConnectScreen() {
               >
                 {loading
                   ? <ActivityIndicator color={colors.textInverse} />
-                  : <Text style={styles.buttonText}>Connect</Text>
+                  : <Text style={styles.buttonText}>{t('connect.connectButton')}</Text>
                 }
               </TouchableOpacity>
             </>
@@ -405,12 +406,10 @@ export default function ConnectScreen() {
 
         {appInfo?.allowPasswordLogin !== false ? (
           <Text style={styles.hint}>
-            {remember
-              ? "Your username and password are encrypted and saved on this device so you don't have to re-enter them."
-              : "This account won't be saved — you'll need to re-enter your credentials next time."}
+            {remember ? t('connect.rememberedHint') : t('connect.notRememberedHint')}
           </Text>
         ) : appInfo?.enableOidc ? (
-          <Text style={styles.hint}>This server requires SSO sign-in — use the button above.</Text>
+          <Text style={styles.hint}>{t('connect.oidcRequiredHint')}</Text>
         ) : null}
       </ScrollView>
 
