@@ -7,8 +7,10 @@ import { useAuth } from '../../context/AuthContext';
 import {
   api, login, saveServerUrl, saveToken, saveAccount, removeAccount, getSavedAccounts,
   saveProxyHeaders, getSavedProxyHeadersForServer, saveProxyHeadersForServer, removeSavedProxyHeadersForServer,
+  getAppInfo,
 } from '../../lib/mealieApi';
-import type { SavedAccount, ProxyHeader } from '../../lib/mealieApi';
+import type { SavedAccount, ProxyHeader, AppInfo } from '../../lib/mealieApi';
+import OidcLoginModal from '../../components/OidcLoginModal';
 import { colors, radius, spacing, typography } from '../../theme';
 
 export default function ConnectScreen() {
@@ -24,6 +26,11 @@ export default function ConnectScreen() {
   const [showProxySection, setShowProxySection] = useState(false);
   const [proxyHeaders, setProxyHeaders] = useState<ProxyHeader[]>([]);
   const [rememberProxyHeaders, setRememberProxyHeaders] = useState(true);
+  // What the entered server actually supports -- null means unknown/unreachable,
+  // which fails open to the password fields (today's default behavior) rather
+  // than hiding them on a network hiccup or an older server without this route.
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+  const [showOidcModal, setShowOidcModal] = useState(false);
   const usernameRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
@@ -34,6 +41,19 @@ export default function ConnectScreen() {
   const usernameOptions = savedAccounts
     .filter(a => a.serverUrl === serverUrl.trim().replace(/\/$/, ''))
     .map(a => a.username);
+
+  // Tells us whether to show password fields, an OIDC button, or both --
+  // fails soft to null (password fields shown) on an empty/invalid URL, an
+  // unreachable server, or an older Mealie version without this route, so
+  // this never blocks the login path that already worked before it existed.
+  const checkAppInfo = async (url: string) => {
+    const trimmed = url.trim().replace(/\/$/, '');
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      setAppInfo(null);
+      return;
+    }
+    setAppInfo(await getAppInfo(trimmed, proxyHeaders.filter(h => h.name.trim())));
+  };
 
   const selectServer = (url: string) => {
     setServerUrl(url);
@@ -54,6 +74,7 @@ export default function ConnectScreen() {
         setShowProxySection(true);
       }
     });
+    checkAppInfo(url);
   };
 
   const addProxyHeader = () => setProxyHeaders(hs => [...hs, { name: '', value: '' }]);
@@ -128,6 +149,31 @@ export default function ConnectScreen() {
     }
   };
 
+  // Mirrors the tail of handleConnect -- no password/remember-account step
+  // since there's no password with SSO, but proxy headers and the server
+  // URL still need to be persisted the same way.
+  const handleOidcSuccess = async (token: string) => {
+    setShowOidcModal(false);
+    const url = serverUrl.trim().replace(/\/$/, '');
+    const activeProxyHeaders = proxyHeaders.filter(h => h.name.trim());
+
+    setLoading(true);
+    try {
+      await Promise.all([saveServerUrl(url), saveToken(token), saveProxyHeaders(activeProxyHeaders)]);
+      const profile = await api.getSelf();
+      if (rememberProxyHeaders && activeProxyHeaders.length > 0) {
+        await saveProxyHeadersForServer(url, activeProxyHeaders);
+      } else {
+        await removeSavedProxyHeadersForServer(url);
+      }
+      await signIn(url, token, profile);
+    } catch (e) {
+      Alert.alert('Connection failed', e instanceof Error ? e.message : 'Could not complete sign-in.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const uniqueServers = [...new Set(savedAccounts.map(a => a.serverUrl))];
 
   return (
@@ -156,8 +202,9 @@ export default function ConnectScreen() {
                 placeholder="http://192.168.1.x:9925"
                 placeholderTextColor={colors.textDisabled}
                 value={serverUrl}
-                onChangeText={v => { setServerUrl(v); setShowServerDrop(false); }}
+                onChangeText={v => { setServerUrl(v); setShowServerDrop(false); setAppInfo(null); }}
                 onFocus={() => setShowServerDrop(uniqueServers.length > 0)}
+                onBlur={() => checkAppInfo(serverUrl)}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
@@ -189,64 +236,79 @@ export default function ConnectScreen() {
             )}
           </View>
 
-          {/* Username */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Username</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                ref={usernameRef}
-                style={styles.input}
-                placeholder="your username"
-                placeholderTextColor={colors.textDisabled}
-                value={username}
-                onChangeText={v => { setUsername(v); setShowUserDrop(false); }}
-                onFocus={() => setShowUserDrop(usernameOptions.length > 0)}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="username"
-                returnKeyType="next"
-                onSubmitEditing={() => passwordRef.current?.focus()}
-              />
-              {usernameOptions.length > 0 && (
-                <TouchableOpacity
-                  style={styles.dropArrow}
-                  onPress={() => setShowUserDrop(s => !s)}
-                >
-                  <Text style={styles.dropArrowText}>{showUserDrop ? '▲' : '▼'}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            {showUserDrop && usernameOptions.length > 0 && (
-              <View style={styles.dropdown}>
-                {usernameOptions.map(user => (
-                  <TouchableOpacity
-                    key={user}
-                    style={styles.dropItem}
-                    onPress={() => selectUsername(user)}
-                  >
-                    <Text style={styles.dropItemText}>{user}</Text>
-                  </TouchableOpacity>
-                ))}
+          {/* Username / Password -- hidden only once we've confirmed the
+              server disallows password login; unknown/unreachable fails
+              open to showing them, same as before this check existed. */}
+          {appInfo?.allowPasswordLogin !== false && (
+            <>
+              <View style={styles.field}>
+                <Text style={styles.label}>Username</Text>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    ref={usernameRef}
+                    style={styles.input}
+                    placeholder="your username"
+                    placeholderTextColor={colors.textDisabled}
+                    value={username}
+                    onChangeText={v => { setUsername(v); setShowUserDrop(false); }}
+                    onFocus={() => setShowUserDrop(usernameOptions.length > 0)}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="username"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                  />
+                  {usernameOptions.length > 0 && (
+                    <TouchableOpacity
+                      style={styles.dropArrow}
+                      onPress={() => setShowUserDrop(s => !s)}
+                    >
+                      <Text style={styles.dropArrowText}>{showUserDrop ? '▲' : '▼'}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {showUserDrop && usernameOptions.length > 0 && (
+                  <View style={styles.dropdown}>
+                    {usernameOptions.map(user => (
+                      <TouchableOpacity
+                        key={user}
+                        style={styles.dropItem}
+                        onPress={() => selectUsername(user)}
+                      >
+                        <Text style={styles.dropItemText}>{user}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
-            )}
-          </View>
 
-          {/* Password */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              ref={passwordRef}
-              style={styles.inputFull}
-              placeholder="your password"
-              placeholderTextColor={colors.textDisabled}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="password"
-              returnKeyType="go"
-              onSubmitEditing={handleConnect}
-            />
-          </View>
+              <View style={styles.field}>
+                <Text style={styles.label}>Password</Text>
+                <TextInput
+                  ref={passwordRef}
+                  style={styles.inputFull}
+                  placeholder="your password"
+                  placeholderTextColor={colors.textDisabled}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  autoComplete="password"
+                  returnKeyType="go"
+                  onSubmitEditing={handleConnect}
+                />
+              </View>
+            </>
+          )}
+
+          {appInfo?.enableOidc && (
+            <TouchableOpacity
+              style={[styles.oidcButton, loading && styles.buttonDisabled]}
+              onPress={() => setShowOidcModal(true)}
+              disabled={loading}
+            >
+              <Text style={styles.oidcButtonText}>Log in with {appInfo.oidcProviderName || 'SSO'}</Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={styles.proxyToggleRow}
@@ -311,38 +373,56 @@ export default function ConnectScreen() {
             </View>
           )}
 
-          <TouchableOpacity
-            style={styles.rememberRow}
-            onPress={() => setRemember(r => !r)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.rememberLabel}>Remember this account</Text>
-            <Switch
-              value={remember}
-              onValueChange={setRemember}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={colors.textPrimary}
-            />
-          </TouchableOpacity>
+          {appInfo?.allowPasswordLogin !== false && (
+            <>
+              <TouchableOpacity
+                style={styles.rememberRow}
+                onPress={() => setRemember(r => !r)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.rememberLabel}>Remember this account</Text>
+                <Switch
+                  value={remember}
+                  onValueChange={setRemember}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={colors.textPrimary}
+                />
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleConnect}
-            disabled={loading}
-          >
-            {loading
-              ? <ActivityIndicator color={colors.textInverse} />
-              : <Text style={styles.buttonText}>Connect</Text>
-            }
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleConnect}
+                disabled={loading}
+              >
+                {loading
+                  ? <ActivityIndicator color={colors.textInverse} />
+                  : <Text style={styles.buttonText}>Connect</Text>
+                }
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
-        <Text style={styles.hint}>
-          {remember
-            ? "Your username and password are encrypted and saved on this device so you don't have to re-enter them."
-            : "This account won't be saved — you'll need to re-enter your credentials next time."}
-        </Text>
+        {appInfo?.allowPasswordLogin !== false ? (
+          <Text style={styles.hint}>
+            {remember
+              ? "Your username and password are encrypted and saved on this device so you don't have to re-enter them."
+              : "This account won't be saved — you'll need to re-enter your credentials next time."}
+          </Text>
+        ) : appInfo?.enableOidc ? (
+          <Text style={styles.hint}>This server requires SSO sign-in — use the button above.</Text>
+        ) : null}
       </ScrollView>
+
+      {showOidcModal && (
+        <OidcLoginModal
+          serverUrl={serverUrl.trim().replace(/\/$/, '')}
+          proxyHeaders={proxyHeaders.filter(h => h.name.trim())}
+          providerName={appInfo?.oidcProviderName || 'SSO'}
+          onSuccess={handleOidcSuccess}
+          onCancel={() => setShowOidcModal(false)}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -516,6 +596,19 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md + 2,
     alignItems: 'center',
     marginTop: spacing.sm,
+  },
+  oidcButton: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md + 2,
+    alignItems: 'center',
+  },
+  oidcButtonText: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.semibold,
+    color: colors.primary,
   },
   buttonDisabled: {
     opacity: 0.6,
