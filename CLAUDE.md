@@ -603,6 +603,25 @@ separately-discovered issue.
 - Bumped to `1.3.2`/versionCode `10`, shipped all three surfaces (GitHub repo pushed, GitHub Release
   `v1.3.2` with signed APK, AAB built for Play Console).
 
+### Session 2026-07-18 (part 3) — old-Mealie-version warning, v1.3.3
+Closed out the last item from part 1's feedback batch ("old mealie version is not supported? add a
+pre version check?"), which had only been researched, not built, earlier in the day.
+- Confirmed a real cutoff by diffing Mealie's own route tree across tags rather than guessing:
+  `/api/households/*` (meal plans, shopping lists, cookbooks — core features this app depends on)
+  was introduced in **v2.0.0**; nothing older can support large parts of this app.
+- Added `isOldMealieVersion()` to `mealieApi.ts` (fails closed to "no warning" on anything that
+  doesn't parse as a leading `x.y` version, e.g. Mealie's own `"develop"` dev-build string) and a
+  non-blocking warning on `ConnectScreen`, using the `version` field from the same `/api/app/about`
+  call already fetched for SSO detection — no new request added.
+- Explicitly scoped as the achievable version of the ask, not full per-feature gating (confirmed
+  with Ken before building) — true per-feature compatibility checking would need the same kind of
+  endpoint-by-endpoint research as the `disableAmount`/comments findings above, repeated across
+  every API surface the app touches, and would be its own multi-session effort like the i18n work.
+- Added the new string to all 10 already-supported languages, keeping ConnectScreen's translation
+  coverage complete rather than leaving an English-only string in a partially-translated screen.
+- `npx tsc --noEmit` clean. Not verified on a physical device (same as parts 1–2 today). Bumped to
+  `1.3.3`/versionCode `11`, shipped all three surfaces.
+
 ### Session 2026-07-18 (part 1) — batch of user feedback: ingredient notes/sections, comments bug, SSO, v1.2.2 + v1.3.0 + v1.3.1
 Five pieces of user feedback arrived at once; triaged each before touching code rather than
 building blind. Confirmed the redirect-downgrade fix from the previous session actually worked for
