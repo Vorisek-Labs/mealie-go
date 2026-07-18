@@ -488,6 +488,46 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 **Session (latest) — 2026-07-17**
 
+### Session 2026-07-17 (part 3) — self-healing retry for POST-downgraded-to-GET on redirect, v1.2.1
+A different user reported "Import from URL" failing with `405: {"detail":"Method Not Allowed"}`
+against a working chefkoch.de URL that imported fine for Ken on his own server. Diagnosed by
+pulling Mealie's actual GitHub source for both parties' exact server versions (v3.19.2 vs v3.20.1)
+rather than guessing:
+- Confirmed via `recipe_crud_routes.py` at both tags that `@router.post("/create/url", ...)` is
+  registered identically in both — ruled out a server-version/endpoint-path mismatch.
+- Confirmed via `scraper_strategies.py`/`scraper.py` that Mealie's own scraper never passes through
+  an origin site's status code — any scrape failure (including a geo-block) surfaces as its own
+  400, never a raw passthrough status. This ruled out the user's "is it a Germany/geo-blocking
+  thing?" theory — a 405 specifically cannot originate from chefkoch.de being blocked.
+- The literal error body (`{"detail":"Method Not Allowed"}`) is Starlette/FastAPI's own default
+  405 response shape — confirmed the request really did reach Mealie's own backend rather than a
+  generic proxy/CDN block page, which would look different.
+- Landed on: the request most likely got silently redirected (e.g. a server force-redirecting
+  http → https, common with Nginx Proxy Manager/Caddy/Traefik defaults) and downgraded from POST to
+  GET along the way — standard behavior for most HTTP clients (incl. Android's OkHttp, which RN's
+  `fetch` uses) following a 301/302. A GET on a POST-only route is exactly what produces this exact
+  Starlette 405.
+- **Fix (self-healing, not a guess-and-hope)**: verified Mealie's API never legitimately returns
+  405 during normal use, so treating any 405 as "retry once against the opposite http/https scheme"
+  is always safe — a real 405 means the server never processed the request at all, so there's no
+  duplicate-write risk. Added `flipUrlScheme()` + `retryOnRedirectDowngrade()` in `mealieApi.ts`,
+  wired into `request()`, `requestMultipart()`, and `login()` (the last of these needed a return-
+  shape change to `{ token, serverUrl }` since the resolved URL can differ from what the user
+  typed — `ConnectScreen` now persists whichever URL actually worked). This protects every API call
+  the app makes, not just URL import, and is completely inert for the normal case where a 405 never
+  happens.
+- `npx tsc --noEmit` clean. Built + verified release APK signature via `apksigner verify
+  --print-certs`. **NOT yet device-tested this round** — no device was connected when this shipped;
+  Ken is updating via the Play Store himself. Also not verified against a real
+  redirect-downgrade-affected server (no such server available to test against) — the fix is
+  reasoned from first principles (RFC 7231 method-downgrade-on-redirect + confirmed Mealie source
+  behavior), not confirmed live yet. If the original reporting user still hits this after updating,
+  that's the next signal to chase.
+- Bumped to `1.2.1`/versionCode `6` (v1.2.0 had already been released the same day, so this
+  couldn't reuse that version). Shipped all three surfaces: pushed to `Vorisek-Labs/mealie-go`, cut
+  GitHub Release `v1.2.1` with the signed APK, built `app-release.aab` — **Ken still needs to
+  upload the AAB to Play Console**.
+
 ### Session 2026-07-17 (part 2) — custom proxy header support, v1.2.0 release
 User feedback from a Play Store reviewer/user asked for "a proxy header for security" — interpreted
 as: their Mealie server sits behind a reverse proxy (Cloudflare Access, Authelia, an API-key-gated
