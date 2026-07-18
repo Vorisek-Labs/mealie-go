@@ -120,7 +120,16 @@ export interface RecipeIngredient {
   note?: string;
   unit?: RecipeUnit;
   food?: RecipeFood;
-  disableAmount: boolean;
+  // Confirmed against Mealie's own schema: this field existed on
+  // RecipeIngredientBase in v2.x but was removed entirely by v3 -- current
+  // Mealie servers never return it and silently ignore it if sent (no
+  // extra='forbid' on their Pydantic models). It's still meaningful as a
+  // same-session, client-only signal between IngredientParseReviewModal and
+  // RecipeEditScreen (before anything is saved), but NEVER trust it on an
+  // ingredient that came back from api.getRecipe()/api.updateRecipe() -- it
+  // will always be undefined there. Use `!quantity` instead for anything
+  // operating on server-loaded data.
+  disableAmount?: boolean;
   quantity?: number;
   originalText?: string;
   referenceId?: string;
@@ -152,7 +161,6 @@ export interface RecipeSettings {
   public: boolean;
   showNutrition: boolean;
   disableComments: boolean;
-  disableAmount: boolean;
   locked: boolean;
 }
 

@@ -100,7 +100,10 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
           // structured ingredient (e.g. one created via Mealie's own web UI,
           // or already parsed here before) down to plain text would silently
           // discard its quantity/unit/food the moment this screen re-saves.
-          const isStructured = !ing.disableAmount && !!ing.quantity;
+          // `ing` here always comes straight from api.getRecipe(), where
+          // disableAmount is never present (Mealie v3+ dropped the field
+          // server-side) -- quantity alone is the only reliable signal.
+          const isStructured = !!ing.quantity;
           return {
             key: `i${i}`,
             text: isStructured ? formatIngredientPreview(ing) : (ing.display ?? ing.originalText ?? ing.note ?? ''),

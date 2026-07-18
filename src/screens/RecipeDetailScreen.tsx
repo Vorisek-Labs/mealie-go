@@ -4,7 +4,7 @@ import {
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
+import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
@@ -167,7 +167,11 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
   const ingredientDisplayLines = useMemo(() => {
     if (!recipe) return [];
     return recipe.recipeIngredient.map(ing => {
-      if (ing.disableAmount || !ing.quantity) {
+      // `disableAmount` never survives a save/reload round-trip (Mealie v3
+      // removed the field server-side -- see the type definition), so
+      // anything reaching this code is judged purely on whether it has a
+      // real quantity to work with.
+      if (!ing.quantity) {
         const structuredParts = [
           ing.unit?.abbreviation ?? ing.unit?.name ?? '',
           ing.food?.name ?? '',
@@ -177,7 +181,7 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
             ? [...structuredParts, ing.note ? `(${ing.note})` : ''].filter(Boolean).join(' ')
             : (ing.note ?? '')
         );
-        return ing.disableAmount ? rawText : scaleFreeformIngredientText(rawText, scale, unitSystem === 'metric');
+        return scaleFreeformIngredientText(rawText, scale, unitSystem === 'metric');
       }
 
       const scaledQty = ing.quantity * scale;
@@ -226,7 +230,13 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
     }
   }, [slug]);
 
-  useEffect(() => { load(); }, [load]);
+  // Refetches every time this screen regains focus, not just on first mount --
+  // RecipeEditScreen is pushed onto the same stack and pops back via
+  // navigation.goBack() on save, so without this, edits (like a newly added
+  // ingredient) would be invisible here until some unrelated remount, even
+  // though the server-side save succeeded (confirmed by reopening Edit,
+  // which always fetches fresh on its own mount).
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   useEffect(() => { getUnitSystemPreference().then(setUnitSystem); }, []);
 
@@ -460,11 +470,14 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
     ? recipeImageSource(serverUrl, token, recipe.id, recipe.image)
     : null;
   const favorite = isFavorite(recipe.id);
-  // Hides the scaler only when truly nothing could change — every ingredient
-  // is explicitly marked as having no amount at all (disableAmount). Anything
-  // else is potentially scalable: either via a structured quantity, or via
+  // Hides the scaler only when there's nothing to even attempt scaling —
+  // `disableAmount` (a would-be per-ingredient "no amount at all" flag)
+  // never survives a save/reload round-trip on Mealie v3+ servers, so it
+  // can't be used to distinguish "definitely not scalable" from "just has
+  // no quantity yet." Anything with at least one ingredient is potentially
+  // scalable, either via a structured quantity or via
   // scaleFreeformIngredientText's best-effort text scaling in ingredientDisplayLines.
-  const hasScalableIngredients = recipe.recipeIngredient.some(i => !i.disableAmount);
+  const hasScalableIngredients = recipe.recipeIngredient.length > 0;
   const prepTimeDisplay = formatTimeText(recipe.prepTime);
   const cookTimeDisplay = displayCookTime(recipe);
   const totalTimeDisplay = formatTimeText(recipe.totalTime);
