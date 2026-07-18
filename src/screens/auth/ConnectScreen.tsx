@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
   api, login, saveServerUrl, saveToken, saveAccount, removeAccount, getSavedAccounts,
   saveProxyHeaders, getSavedProxyHeadersForServer, saveProxyHeadersForServer, removeSavedProxyHeadersForServer,
-  getAppInfo,
+  getAppInfo, isOldMealieVersion,
 } from '../../lib/mealieApi';
 import type { SavedAccount, ProxyHeader, AppInfo } from '../../lib/mealieApi';
 import OidcLoginModal from '../../components/OidcLoginModal';
@@ -237,6 +237,12 @@ export default function ConnectScreen() {
               </View>
             )}
           </View>
+
+          {appInfo && isOldMealieVersion(appInfo.version) && (
+            <Text style={styles.oldVersionWarning}>
+              {t('connect.oldVersionWarning', { version: appInfo.version })}
+            </Text>
+          )}
 
           {/* Username / Password -- hidden only once we've confirmed the
               server disallows password login; unknown/unreachable fails
@@ -521,6 +527,11 @@ const styles = StyleSheet.create({
   dropItemText: {
     fontSize: typography.size.md,
     color: colors.textPrimary,
+  },
+  oldVersionWarning: {
+    fontSize: typography.size.sm,
+    color: colors.warning,
+    lineHeight: typography.size.sm * 1.5,
   },
   proxyToggleRow: {
     paddingVertical: spacing.xs,

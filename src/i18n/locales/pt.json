@@ -18,6 +18,7 @@
     "connectButton": "Conectar",
     "oidcButton": "Entrar com {{provider}}",
     "oidcRequiredHint": "Este servidor requer login via SSO — use o botão acima.",
+    "oldVersionWarning": "Este servidor está rodando o Mealie {{version}}, uma versão mais antiga do que este aplicativo suporta totalmente (v2.0.0+) — alguns recursos podem não funcionar corretamente.",
     "rememberedHint": "Seu nome de usuário e senha são criptografados e salvos neste dispositivo para que você não precise digitá-los novamente.",
     "notRememberedHint": "Esta conta não será salva — você precisará inserir suas credenciais novamente na próxima vez.",
     "missingFieldsTitle": "Campos incompletos",

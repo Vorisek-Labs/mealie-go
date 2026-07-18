@@ -18,6 +18,7 @@
     "connectButton": "Connect",
     "oidcButton": "Log in with {{provider}}",
     "oidcRequiredHint": "This server requires SSO sign-in — use the button above.",
+    "oldVersionWarning": "This server is running Mealie {{version}}, which is older than this app fully supports (v2.0.0+) — some features may not work correctly.",
     "rememberedHint": "Your username and password are encrypted and saved on this device so you don't have to re-enter them.",
     "notRememberedHint": "This account won't be saved — you'll need to re-enter your credentials next time.",
     "missingFieldsTitle": "Missing fields",

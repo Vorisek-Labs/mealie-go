@@ -325,6 +325,22 @@ export async function getAppInfo(serverUrl: string, proxyHeaders: ProxyHeader[] 
   }
 }
 
+// Mealie's /api/households/* routes (meal plans, shopping lists, cookbooks
+// -- core features this app depends on) were introduced in v2.0.0,
+// confirmed by diffing Mealie's own route tree across tags; anything older
+// can't support large parts of this app. Returns false (no warning) for
+// anything that doesn't parse as a leading x.y version, e.g. a "develop"/
+// nightly build string, rather than risking a false alarm on an
+// unrecognized format.
+const MIN_SUPPORTED_MAJOR_VERSION = 2;
+
+export function isOldMealieVersion(version: string | undefined): boolean {
+  if (!version) return false;
+  const match = /^v?(\d+)\./.exec(version.trim());
+  if (!match) return false;
+  return parseInt(match[1], 10) < MIN_SUPPORTED_MAJOR_VERSION;
+}
+
 // Mealie's own OIDC flow is designed only for its first-party web app: the
 // provider's redirect_uri is fixed to Mealie's own {serverUrl}/login (see
 // Mealie's OIDC docs -- custom schemes aren't supported), where its SPA's

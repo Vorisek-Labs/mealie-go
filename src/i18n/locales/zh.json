@@ -18,6 +18,7 @@
     "connectButton": "连接",
     "oidcButton": "使用 {{provider}} 登录",
     "oidcRequiredHint": "此服务器需要单点登录（SSO）——请使用上方的按钮。",
+    "oldVersionWarning": "此服务器运行的是 Mealie {{version}}，低于本应用完全支持的版本（v2.0.0 及以上）——部分功能可能无法正常工作。",
     "rememberedHint": "您的用户名和密码将加密保存在此设备上，无需再次输入。",
     "notRememberedHint": "此账户不会被保存——下次需要重新输入您的凭据。",
     "missingFieldsTitle": "缺少信息",

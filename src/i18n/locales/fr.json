@@ -18,6 +18,7 @@
     "connectButton": "Se connecter",
     "oidcButton": "Se connecter avec {{provider}}",
     "oidcRequiredHint": "Ce serveur nécessite une connexion SSO — utilisez le bouton ci-dessus.",
+    "oldVersionWarning": "Ce serveur utilise Mealie {{version}}, une version antérieure à celle prise en charge par cette application (v2.0.0+) — certaines fonctionnalités peuvent ne pas fonctionner correctement.",
     "rememberedHint": "Votre nom d'utilisateur et votre mot de passe sont chiffrés et enregistrés sur cet appareil afin que vous n'ayez pas à les saisir à nouveau.",
     "notRememberedHint": "Ce compte ne sera pas enregistré — vous devrez ressaisir vos identifiants la prochaine fois.",
     "missingFieldsTitle": "Champs manquants",

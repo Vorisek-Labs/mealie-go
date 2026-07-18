@@ -18,6 +18,7 @@
     "connectButton": "Conectar",
     "oidcButton": "Iniciar sesión con {{provider}}",
     "oidcRequiredHint": "Este servidor requiere inicio de sesión SSO — usa el botón de arriba.",
+    "oldVersionWarning": "Este servidor usa Mealie {{version}}, una versión anterior a la que esta app admite completamente (v2.0.0+) — algunas funciones podrían no funcionar correctamente.",
     "rememberedHint": "Tu usuario y contraseña se guardan cifrados en este dispositivo para que no tengas que volver a escribirlos.",
     "notRememberedHint": "Esta cuenta no se guardará — tendrás que volver a introducir tus credenciales la próxima vez.",
     "missingFieldsTitle": "Campos incompletos",
