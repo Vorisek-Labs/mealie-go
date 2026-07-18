@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { api } from '../lib/mealieApi';
 import { colors, radius, spacing, typography } from '../theme';
@@ -89,6 +89,11 @@ export default function IngredientParseReviewModal({ visible, ingredientLines, o
   const updateCurrentField = (field: PickerField, value: RecipeFood | RecipeUnit) => {
     if (currentIdx == null) return;
     setResolved(prev => prev.map((ing, i) => i === currentIdx ? { ...ing, [field]: value } : ing));
+  };
+
+  const updateCurrentNote = (value: string) => {
+    if (currentIdx == null) return;
+    setResolved(prev => prev.map((ing, i) => i === currentIdx ? { ...ing, note: value } : ing));
   };
 
   const advanceReview = (accept: boolean) => {
@@ -217,12 +222,16 @@ export default function IngredientParseReviewModal({ visible, ingredientLines, o
               </View>
               {renderFieldRow('Unit', 'unit', currentIngredient.unit)}
               {renderFieldRow('Food', 'food', currentIngredient.food)}
-              {currentIngredient.note ? (
-                <View style={styles.fieldRow}>
-                  <Text style={styles.fieldLabel}>Note</Text>
-                  <Text style={styles.fieldValueText}>{currentIngredient.note}</Text>
-                </View>
-              ) : null}
+              <View style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>Note</Text>
+                <TextInput
+                  style={styles.noteInput}
+                  value={currentIngredient.note ?? ''}
+                  onChangeText={updateCurrentNote}
+                  placeholder="Add a note (optional)"
+                  placeholderTextColor={colors.textDisabled}
+                />
+              </View>
             </View>
 
             <View style={styles.reviewActions}>
@@ -312,6 +321,11 @@ const styles = StyleSheet.create({
   fieldLabel: { width: 70, fontSize: typography.size.sm, color: colors.textSecondary, fontWeight: typography.weight.medium },
   fieldValue: { flex: 1 },
   fieldValueText: { flex: 1, fontSize: typography.size.md, color: colors.textPrimary },
+  noteInput: {
+    flex: 1, fontSize: typography.size.md, color: colors.textPrimary,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm, paddingVertical: spacing.xs,
+  },
   matchedText: { fontSize: typography.size.md, color: colors.success, fontWeight: typography.weight.medium },
   unmatchedText: { fontSize: typography.size.md, color: colors.warning, fontWeight: typography.weight.medium },
   noneText: { fontSize: typography.size.md, color: colors.textDisabled },

@@ -563,14 +563,22 @@ export const api = {
   getComments: (slug: string) =>
     request<RecipeComment[]>(`/api/recipes/${slug}/comments`),
 
+  // Comments live under a top-level /api/comments router, NOT nested under
+  // /api/recipes -- confirmed against Mealie's actual router registration
+  // (`APIRouter(prefix="/comments", ...)`), which only mounts a GET for
+  // listing a recipe's comments under /api/recipes/{slug}/comments (see
+  // getComments above); create/delete are both under /api/comments itself.
+  // The old /api/recipes/comments path here doesn't exist on any Mealie
+  // version and would 404/405 every time -- this was never exercised
+  // against a live server before shipping.
   addComment: (recipeId: string, text: string) =>
-    request<RecipeComment>('/api/recipes/comments', {
+    request<RecipeComment>('/api/comments', {
       method: 'POST',
       body: JSON.stringify({ recipeId, text }),
     }),
 
   deleteComment: (commentId: string) =>
-    request<void>(`/api/recipes/comments/${commentId}`, { method: 'DELETE' }),
+    request<void>(`/api/comments/${commentId}`, { method: 'DELETE' }),
 
   // Shopping labels
   getShoppingLabels: () =>

@@ -13,7 +13,7 @@ interface Props {
   onClose: () => void;
   recipeName: string;
   steps: CookModeStep[];
-  ingredientLines: string[];
+  ingredientLines: { text: string; title?: string }[];
 }
 
 // Rendered only while `visible`, so the wake-lock (via useKeepAwake below)
@@ -53,9 +53,12 @@ function CookModeContent({ onClose, recipeName, steps, ingredientLines }: Omit<P
         <ScrollView style={styles.ingredientsPanel} contentContainerStyle={styles.ingredientsPanelContent}>
           <Text style={styles.ingredientsPanelTitle}>Ingredients</Text>
           {ingredientLines.map((line, i) => (
-            <View key={i} style={styles.ingredientRow}>
-              <View style={styles.ingredientBullet} />
-              <Text style={styles.ingredientText}>{line}</Text>
+            <View key={i}>
+              {line.title ? <Text style={styles.ingredientSectionTitle}>{line.title}</Text> : null}
+              <View style={styles.ingredientRow}>
+                <View style={styles.ingredientBullet} />
+                <Text style={styles.ingredientText}>{line.text}</Text>
+              </View>
             </View>
           ))}
         </ScrollView>
@@ -136,6 +139,10 @@ const styles = StyleSheet.create({
   ingredientRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs },
   ingredientBullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginTop: 7 },
   ingredientText: { flex: 1, fontSize: typography.size.md, color: colors.textPrimary, lineHeight: typography.size.md * 1.4 },
+  ingredientSectionTitle: {
+    fontSize: typography.size.md, fontWeight: typography.weight.semibold, color: colors.textPrimary,
+    marginTop: spacing.sm, marginBottom: spacing.xs,
+  },
   stepCounter: {
     textAlign: 'center', fontSize: typography.size.sm, fontWeight: typography.weight.semibold,
     color: colors.primary, textTransform: 'uppercase', letterSpacing: 1,

@@ -24,7 +24,12 @@ type Props = {
 // read-only preview at that point, since editing it in place would silently
 // invalidate the structure. Unparsed rows are plain freeform text, same as
 // this editor has always worked.
-type IngDraft = { key: string; text: string; parsed?: RecipeIngredient };
+// `title` mirrors Mealie's own "toggle section" behavior: it's a section
+// heading attached to whichever ingredient row starts a new section (e.g.
+// "Sauce"), rendered directly above that row -- not a separate divider
+// type. `undefined` means no title editor shown for this row; `''` means
+// shown but not yet typed.
+type IngDraft = { key: string; text: string; parsed?: RecipeIngredient; title?: string };
 type StepDraft = { key: string; title: string; text: string };
 type NoteDraft = { key: string; title: string; text: string };
 
@@ -100,6 +105,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
             key: `i${i}`,
             text: isStructured ? formatIngredientPreview(ing) : (ing.display ?? ing.originalText ?? ing.note ?? ''),
             parsed: isStructured ? ing : undefined,
+            title: ing.title ?? undefined,
           };
         }));
         setSteps(r.recipeInstructions.map((step, i) => ({
@@ -151,8 +157,11 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         tags: selectedTags,
         recipeCategory: selectedCategories,
         recipeIngredient: ingredients
-          .filter(i => i.parsed || i.text.trim())
-          .map(i => i.parsed ?? { note: i.text.trim(), originalText: i.text.trim(), disableAmount: true }),
+          .filter(i => i.parsed || i.text.trim() || i.title?.trim())
+          .map(i => ({
+            ...(i.parsed ?? { note: i.text.trim(), originalText: i.text.trim(), disableAmount: true }),
+            title: i.title?.trim() || undefined,
+          })),
         recipeInstructions: steps
           .filter(s => s.text.trim())
           .map(s => ({ title: s.title.trim() || undefined, text: s.text.trim() })),
@@ -307,38 +316,61 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         </View>
 
         {ingredients.map((ing, idx) => (
-          <View key={ing.key} style={styles.listRow}>
-            <View style={styles.bulletCircle}>
-              <Text style={styles.bulletText}>{idx + 1}</Text>
-            </View>
-            {ing.parsed ? (
-              <View style={[styles.input, styles.listInput, styles.parsedRow]}>
-                <Text style={styles.parsedRowText}>{ing.text}</Text>
-                <TouchableOpacity
-                  onPress={() => setIngredients(prev => prev.map(i => i.key === ing.key ? { ...i, parsed: undefined } : i))}
-                >
-                  <Text style={styles.editAsTextLink}>Edit as text</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
+          <View key={ing.key}>
+            {ing.title !== undefined && (
               <TextInput
-                style={[styles.input, styles.listInput]}
-                value={ing.text}
-                onChangeText={text =>
-                  setIngredients(prev => prev.map(i => i.key === ing.key ? { ...i, text } : i))
+                style={styles.sectionTitleInput}
+                value={ing.title}
+                onChangeText={title =>
+                  setIngredients(prev => prev.map(i => i.key === ing.key ? { ...i, title } : i))
                 }
-                placeholder="e.g. 2 cups all-purpose flour"
+                placeholder="Section title (e.g. Sauce)"
                 placeholderTextColor={colors.textDisabled}
-                multiline
               />
             )}
-            <TouchableOpacity
-              style={styles.removeBtn}
-              onPress={() => setIngredients(prev => prev.filter(i => i.key !== ing.key))}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={styles.removeBtnText}>✕</Text>
-            </TouchableOpacity>
+            <View style={styles.listRow}>
+              <View style={styles.bulletCircle}>
+                <Text style={styles.bulletText}>{idx + 1}</Text>
+              </View>
+              {ing.parsed ? (
+                <View style={[styles.input, styles.listInput, styles.parsedRow]}>
+                  <Text style={styles.parsedRowText}>{ing.text}</Text>
+                  <TouchableOpacity
+                    onPress={() => setIngredients(prev => prev.map(i => i.key === ing.key ? { ...i, parsed: undefined } : i))}
+                  >
+                    <Text style={styles.editAsTextLink}>Edit as text</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TextInput
+                  style={[styles.input, styles.listInput]}
+                  value={ing.text}
+                  onChangeText={text =>
+                    setIngredients(prev => prev.map(i => i.key === ing.key ? { ...i, text } : i))
+                  }
+                  placeholder="e.g. 2 cups all-purpose flour"
+                  placeholderTextColor={colors.textDisabled}
+                  multiline
+                />
+              )}
+              <TouchableOpacity
+                style={styles.removeBtn}
+                onPress={() => setIngredients(prev => prev.map(i => i.key === ing.key
+                  ? { ...i, title: i.title === undefined ? '' : undefined }
+                  : i
+                ))}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.sectionToggleText}>{ing.title !== undefined ? '▤▾' : '▤'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.removeBtn}
+                onPress={() => setIngredients(prev => prev.filter(i => i.key !== ing.key))}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.removeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ))}
 
@@ -729,6 +761,20 @@ const styles = StyleSheet.create({
   removeBtnText: {
     fontSize: 14,
     color: colors.textDisabled,
+  },
+  sectionToggleText: {
+    fontSize: 13,
+    color: colors.primary,
+  },
+  sectionTitleInput: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginLeft: 32,
+    marginBottom: spacing.xs,
+    paddingVertical: spacing.xs,
+    fontSize: typography.size.sm,
+    fontWeight: typography.weight.semibold,
+    color: colors.textPrimary,
   },
   stepBlock: {
     gap: spacing.xs,

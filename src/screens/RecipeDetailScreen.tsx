@@ -614,9 +614,14 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
               {ingredientDisplayLines.length === 0 ? (
                 <Text style={styles.emptyText}>No ingredients listed</Text>
               ) : ingredientDisplayLines.map((displayText, i) => (
-                <View key={i} style={styles.ingredient}>
-                  <View style={styles.bullet} />
-                  <Text style={styles.ingredientText}>{displayText}</Text>
+                <View key={i}>
+                  {recipe.recipeIngredient[i]?.title ? (
+                    <Text style={styles.ingredientSectionTitle}>{recipe.recipeIngredient[i].title}</Text>
+                  ) : null}
+                  <View style={styles.ingredient}>
+                    <View style={styles.bullet} />
+                    <Text style={styles.ingredientText}>{displayText}</Text>
+                  </View>
                 </View>
               ))}
             </View>
@@ -833,7 +838,7 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
         onClose={() => setShowCookMode(false)}
         recipeName={recipe.name}
         steps={cookModeSteps}
-        ingredientLines={ingredientDisplayLines}
+        ingredientLines={ingredientDisplayLines.map((text, i) => ({ text, title: recipe.recipeIngredient[i]?.title ?? undefined }))}
       />
     </View>
   );
@@ -974,6 +979,10 @@ const styles = StyleSheet.create({
   ingredient: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs },
   bullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginTop: 7 },
   ingredientText: { flex: 1, fontSize: typography.size.md, color: colors.textPrimary, lineHeight: typography.size.md * 1.5 },
+  ingredientSectionTitle: {
+    fontSize: typography.size.lg, fontWeight: typography.weight.semibold, color: colors.textPrimary,
+    marginTop: spacing.md, marginBottom: spacing.xs,
+  },
   step: { flexDirection: 'row', gap: spacing.md, paddingVertical: spacing.xs },
   stepNumber: { width: 28, height: 28, borderRadius: radius.full, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
   stepNumberText: { fontSize: typography.size.sm, fontWeight: typography.weight.bold, color: colors.textInverse },
