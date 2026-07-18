@@ -214,6 +214,17 @@ Base URL: whatever the user entered on ConnectScreen.
 | PUT | `/api/recipes/{slug}` | Full recipe body |
 | DELETE | `/api/recipes/{slug}` | |
 
+**`RecipeIngredient.disableAmount` does not exist on Mealie v3+** — confirmed against Mealie's own
+schema (`RecipeIngredientBase` in `mealie/schema/recipe/recipe_ingredient.py`): this field was
+present in v2.x but removed entirely by v3. Current servers never return it, and silently ignore it
+if sent (Mealie's Pydantic models don't set `extra='forbid'`). Fixed 2026-07-18 after this caused
+dead/misleading logic in three places that treated it as if it reliably reflected server state after
+a reload (it never does — `!quantity` is the only signal that actually survives a round-trip). It's
+still legitimately used as a same-session, client-only signal between `IngredientParseReviewModal`
+and `RecipeEditScreen`, before anything is saved — that usage is fine and was left alone. If you're
+tempted to read `ing.disableAmount` on anything that came from `api.getRecipe()` or
+`api.updateRecipe()`, don't — it will always be `undefined` there.
+
 ### Images & Assets (CRITICAL: use recipe UUID, not slug)
 `{serverUrl}/api/media/recipes/{recipeId}/images/original.webp`
 `{serverUrl}/api/media/recipes/{recipeId}/assets/{fileName}`
@@ -566,7 +577,33 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 **Session (latest) — 2026-07-18**
 
-### Session 2026-07-18 — batch of user feedback: ingredient notes/sections, comments bug, SSO, v1.2.2 + v1.3.0
+### Session 2026-07-18 (part 2) — stale recipe view after edit, dead disableAmount field, v1.3.2
+User reported: "adding an ingredient to an existing recipe manually and it's not displaying, but
+every time I go to edit, I can see it still in there." Diagnosed as a stale-data bug, not a save
+bug — see the new `disableAmount` note in the API Reference's Recipes section above for the second,
+separately-discovered issue.
+- **Root cause**: `RecipeDetailScreen` only fetched via a plain `useEffect` keyed on `slug` (fires
+  once on mount). `RecipeEditScreen` is pushed onto the same native-stack and pops back via
+  `navigation.goBack()` on save — so the detail screen kept showing whatever it had BEFORE the edit
+  began, indefinitely, since nothing ever told it to refetch. `RecipeEditScreen` itself always
+  looked correct because it re-fetches fresh on its own mount every time. **Fix**: replaced the
+  plain `useEffect` with `useFocusEffect`, so it refetches every time the screen regains focus, not
+  just the first time.
+- Checked for the same bug class elsewhere (`grep` for `navigation.navigate('...Edit`) — this is
+  the only detail→edit→back flow in the app, so no other screens needed the same fix.
+- **Separately found and fixed**: `RecipeIngredient.disableAmount` doesn't exist on Mealie v3+ at
+  all (existed in v2.x, removed in the v3 rewrite — confirmed against Mealie's actual schema
+  source). Three places in the app treated it as if it reliably reflected server state after a
+  reload, which it never has, in any version of this app — `!quantity` is what actually determines
+  the behavior today and always has. Fixed those three; left its legitimate same-session use
+  between the parse-review modal and the edit screen alone, since that never touches the server.
+  Also dropped the field from the unrelated, entirely-unused `RecipeSettings` type (also not real).
+- `npx tsc --noEmit` clean. **Not verified on a physical device** — no device was connected; Ken
+  accepted shipping without a device pass again, verifying via Play Store update afterward.
+- Bumped to `1.3.2`/versionCode `10`, shipped all three surfaces (GitHub repo pushed, GitHub Release
+  `v1.3.2` with signed APK, AAB built for Play Console).
+
+### Session 2026-07-18 (part 1) — batch of user feedback: ingredient notes/sections, comments bug, SSO, v1.2.2 + v1.3.0 + v1.3.1
 Five pieces of user feedback arrived at once; triaged each before touching code rather than
 building blind. Confirmed the redirect-downgrade fix from the previous session actually worked for
 the reporting user first.
