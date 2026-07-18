@@ -102,23 +102,25 @@ export default function ConnectScreen() {
 
     setLoading(true);
     try {
-      const token = await login(url, user, pass, activeProxyHeaders);
-      await Promise.all([saveServerUrl(url), saveToken(token), saveProxyHeaders(activeProxyHeaders)]);
+      // The resolved serverUrl may differ from what was entered — e.g. the
+      // server force-redirects to the other scheme (see login()'s comment).
+      const { token, serverUrl: resolvedUrl } = await login(url, user, pass, activeProxyHeaders);
+      await Promise.all([saveServerUrl(resolvedUrl), saveToken(token), saveProxyHeaders(activeProxyHeaders)]);
       const profile = await api.getSelf();
       if (remember) {
-        await saveAccount({ serverUrl: url, username: user, password: pass });
+        await saveAccount({ serverUrl: resolvedUrl, username: user, password: pass });
       } else {
         // Someone may have saved this exact account from an earlier login —
         // turning "remember" off now should actually forget it, not just
         // skip re-saving it.
-        await removeAccount(url, user);
+        await removeAccount(resolvedUrl, user);
       }
       if (rememberProxyHeaders && activeProxyHeaders.length > 0) {
-        await saveProxyHeadersForServer(url, activeProxyHeaders);
+        await saveProxyHeadersForServer(resolvedUrl, activeProxyHeaders);
       } else {
-        await removeSavedProxyHeadersForServer(url);
+        await removeSavedProxyHeadersForServer(resolvedUrl);
       }
-      await signIn(url, token, profile);
+      await signIn(resolvedUrl, token, profile);
     } catch (e) {
       Alert.alert('Connection failed', e instanceof Error ? e.message : 'Could not connect to server.');
     } finally {

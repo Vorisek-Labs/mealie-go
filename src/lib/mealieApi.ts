@@ -41,6 +41,14 @@ function headersToRecord(headers: ProxyHeader[]): Record<string, string> {
   return record;
 }
 
+// Swaps http:// <-> https://, or returns null if the URL doesn't start with
+// either (shouldn't happen — ConnectScreen requires one of the two).
+function flipUrlScheme(url: string): string | null {
+  if (url.startsWith('https://')) return `http://${url.slice('https://'.length)}`;
+  if (url.startsWith('http://')) return `https://${url.slice('http://'.length)}`;
+  return null;
+}
+
 // Active for the current signed-in session — read fresh on every request,
 // independent of the "remember" toggle below (mirrors how the auth token
 // itself always persists across app restarts regardless of that toggle).
@@ -147,17 +155,43 @@ export async function clearCredentials(): Promise<void> {
   await SecureStore.deleteItemAsync(PROXY_HEADERS_KEY);
 }
 
+// Mealie's own API never legitimately returns 405 during normal use — every
+// route either exists and accepts the method the app sends, or doesn't
+// exist at all (confirmed against Mealie's own router/scraper source; even
+// a fully-blocked URL-import scrape surfaces as a 400, never a passthrough
+// status). So a 405 on a request we built correctly is always a routing
+// mismatch, most often a request that got silently redirected and
+// downgraded from POST/PUT/DELETE to GET along the way — the default
+// behavior of most HTTP clients (including Android's OkHttp under RN's
+// fetch) when following a 301/302, which commonly happens when a server
+// force-redirects http -> https (via Nginx Proxy Manager, Caddy, Traefik,
+// etc.) and the saved server URL still uses the other scheme. A genuine 405
+// means the server never actually processed the request, so retrying is
+// always safe — this one retry goes straight to the opposite scheme,
+// reaching the server directly without needing a redirect at all.
+async function retryOnRedirectDowngrade(
+  res: Response, serverUrl: string, refetch: (base: string) => Promise<Response>
+): Promise<Response> {
+  if (res.status !== 405) return res;
+  const flipped = flipUrlScheme(serverUrl);
+  if (!flipped) return res;
+  const retryRes = await refetch(flipped);
+  if (retryRes.status === 405) return res;
+  await saveServerUrl(flipped);
+  return retryRes;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const [serverUrl, token, proxyHeaders] = await Promise.all([getServerUrl(), getToken(), getProxyHeaders()]);
-  const res = await fetch(`${serverUrl}${path}`, {
-    ...options,
-    headers: {
-      ...headersToRecord(proxyHeaders),
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(options.headers as Record<string, string>),
-    },
-  });
+  const headers = {
+    ...headersToRecord(proxyHeaders),
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+    ...(options.headers as Record<string, string>),
+  };
+  const doFetch = (base: string) => fetch(`${base}${path}`, { ...options, headers });
+
+  const res = await retryOnRedirectDowngrade(await doFetch(serverUrl), serverUrl, doFetch);
   if (res.status === 401) throw new Error('UNAUTHORIZED');
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
@@ -171,11 +205,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 // multipart/form-data boundary itself from the FormData body.
 async function requestMultipart<T>(path: string, method: string, form: FormData): Promise<T> {
   const [serverUrl, token, proxyHeaders] = await Promise.all([getServerUrl(), getToken(), getProxyHeaders()]);
-  const res = await fetch(`${serverUrl}${path}`, {
-    method,
-    headers: { ...headersToRecord(proxyHeaders), Authorization: `Bearer ${token}` },
-    body: form,
-  });
+  const headers = { ...headersToRecord(proxyHeaders), Authorization: `Bearer ${token}` };
+  const doFetch = (base: string) => fetch(`${base}${path}`, { method, headers, body: form });
+
+  const res = await retryOnRedirectDowngrade(await doFetch(serverUrl), serverUrl, doFetch);
   if (res.status === 401) throw new Error('UNAUTHORIZED');
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
@@ -232,25 +265,40 @@ function buildRecipeQuery(params?: RecipeQueryParams): URLSearchParams {
   return q;
 }
 
+// Returns the resolved serverUrl alongside the token — see
+// retryOnRedirectDowngrade above; the initial URL the user entered may not
+// be the one that actually worked (e.g. it force-redirects to the other
+// scheme), and the caller needs to persist whichever one actually succeeded.
 export async function login(
   serverUrl: string, username: string, password: string, proxyHeaders: ProxyHeader[] = []
-): Promise<string> {
+): Promise<{ token: string; serverUrl: string }> {
   const base = serverUrl.replace(/\/$/, '');
   const body = new URLSearchParams({ username, password, remember_me: 'false' });
-  const res = await fetch(`${base}/api/auth/token`, {
-    method: 'POST',
-    headers: {
-      ...headersToRecord(proxyHeaders),
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: body.toString(),
-  });
+  const headers = {
+    ...headersToRecord(proxyHeaders),
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+  const attempt = (b: string) => fetch(`${b}/api/auth/token`, { method: 'POST', headers, body: body.toString() });
+
+  let res = await attempt(base);
+  let resolvedBase = base;
+  if (res.status === 405) {
+    const flipped = flipUrlScheme(base);
+    if (flipped) {
+      const retryRes = await attempt(flipped);
+      if (retryRes.status !== 405) {
+        res = retryRes;
+        resolvedBase = flipped;
+      }
+    }
+  }
+
   if (!res.ok) {
     const data = await res.json().catch(() => null);
     throw new Error(data?.detail ?? 'Invalid username or password');
   }
   const data = await res.json();
-  return data.access_token as string;
+  return { token: data.access_token as string, serverUrl: resolvedBase };
 }
 
 // Media endpoints take the recipe UUID (recipe.id), NOT the slug —
