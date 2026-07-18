@@ -295,6 +295,45 @@ empty filter string, same as the "no filter" default.
 | POST | `/api/auth/token` | Form data (NOT JSON): `username, password, remember_me` |
 | GET | `/api/users/self` | Returns UserProfile (includes `groupSlug`, used for share links) |
 | GET | `/api/auth/refresh` | Re-signs a **still-valid** token for a fresh one. Cannot recover an already-expired token — must be called proactively, not reactively on 401. `AuthContext` calls this every 6h and on app-foreground. |
+| GET | `/api/app/about` | **Unauthenticated.** Returns `AppInfo`: `version`, `enableOidc`, `oidcProviderName`, `allowPasswordLogin`. `ConnectScreen` calls this on server-URL blur (`getAppInfo()` in `mealieApi.ts`) to decide whether to show password fields, an OIDC button, or both — fails soft to `null` (password fields shown) on any error so it can never regress the existing login path. |
+| GET | `/api/auth/oauth` | Kicks off Mealie's server-side OIDC redirect. See "SSO / OIDC login" below — opened in an embedded WebView, not called directly. |
+
+### Comments
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/recipes/{slug}/comments` | List a recipe's comments |
+| POST | `/api/comments` | Body: `{ recipeId, text }`. **Not** `/api/recipes/comments` — confirmed against Mealie's actual router (`APIRouter(prefix="/comments", ...)`, mounted top-level, NOT nested under `/api/recipes`) — the old path here doesn't exist on any Mealie version and 404s/405s every time. This was shipped broken and never exercised against a live server until a user reported it (fixed 2026-07-18). |
+| DELETE | `/api/comments/{commentId}` | Same prefix correction as above |
+
+### SSO / OIDC login
+Added 2026-07-18 after user feedback ("no SSO support?") plus a related finding: `allowPasswordLogin`
+can be `false` for a server configured SSO-only, which before this fix meant the app simply couldn't
+log in at all, with zero explanation.
+
+Confirmed against Mealie's own OIDC implementation (`mealie/routes/auth/auth.py`) and its published
+docs (docs.mealie.io/documentation/getting-started/authentication/oidc) that the flow is designed
+**only** for Mealie's first-party web app: the OIDC provider's `redirect_uri` is hardcoded to
+Mealie's own `{serverUrl}/login` (custom app schemes aren't supported), where Mealie's own SPA
+(`login.vue`) detects the `?code=&state=` callback client-side and completes the exchange itself via
+`GET /api/auth/oauth/callback`, storing the result in a plain (**non-httpOnly**) `mealie.access_token`
+cookie — confirmed via the frontend's own `nuxt.config.ts` (`AUTH_TOKEN` constant) and
+`use-token-cookie.ts` (Nuxt's client-side `useCookie`, which by construction can never set httpOnly,
+since only a `Set-Cookie` response header can do that).
+
+Rather than reimplementing that exchange ourselves, `OidcLoginModal.tsx` opens
+`{serverUrl}/api/auth/oauth` in an embedded WebView (`react-native-webview`, added 2026-07-18) and
+lets Mealie's own SPA complete the entire flow untouched — including the provider redirect and the
+code exchange — then reads the resulting cookie via `injectedJavaScript` (a self-clearing
+`setInterval` poll for `document.cookie`'s `mealie.access_token`, since the cookie only appears after
+an async XHR the SPA fires post-load, not at page-load time). A `?direct=1` redirect back to
+Mealie's own login page is Mealie's own failure signal (see `login.vue`'s `oauthAuthenticate` catch
+block) and is treated as a cancel. `ConnectScreen` proxies proxy-headers (see above) onto the
+WebView's *initial* request only — `react-native-webview`'s `headers` prop doesn't apply to
+subsequent in-WebView navigations, a known library limitation, so a proxy header requirement that
+covers the OIDC provider's own domain (not just Mealie's) won't be honored past the first hop.
+
+**Not yet verified against a real OIDC-configured Mealie server** — none was available this session.
+If SSO login is reported broken, this whole section is the first place to check.
 
 ### Custom proxy headers — not a Mealie API, a reverse-proxy concern
 Added 2026-07-17 after user feedback: some self-hosted setups put Mealie behind a reverse proxy
@@ -486,7 +525,53 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 ## Current Build Status
 
-**Session (latest) — 2026-07-17**
+**Session (latest) — 2026-07-18**
+
+### Session 2026-07-18 — batch of user feedback: ingredient notes/sections, comments bug, SSO, v1.2.2 + v1.3.0
+Five pieces of user feedback arrived at once; triaged each before touching code rather than
+building blind. Confirmed the redirect-downgrade fix from the previous session actually worked for
+the reporting user first.
+
+**v1.2.2 (three items, shipped as one release):**
+- **Ingredient note field always editable** — `IngredientParseReviewModal.tsx`'s per-ingredient
+  Note field in the parse-review dialog was a read-only `Text`, shown only when already non-empty.
+  Now always shown and editable (`updateCurrentNote`).
+- **Fixed the comments bug** — see the new Comments section in the API Reference above. Real root
+  cause (wrong path, `/api/recipes/comments` instead of `/api/comments`), confirmed against
+  Mealie's actual router source, not a guess.
+- **Ingredient section titles** ("Preparation"/"Main"/"Sauce") — confirmed via Mealie's own
+  `RecipeIngredient` schema and its web editor (`RecipeIngredientEditor.vue`'s `toggleTitle()`)
+  that this is an existing per-ingredient `title` field with a "toggle section" UI, not a separate
+  divider type — matched that exact behavior instead of inventing something new.
+  `RecipeEditScreen` gets a per-row toggle; `RecipeDetailScreen` and `CookModeModal` render the
+  title as a heading above that ingredient.
+
+**v1.3.0 (SSO/OIDC login — the bigger item):**
+See the new SSO / OIDC login section in the API Reference above for the full technical trace
+(Mealie's OIDC flow is web-only by design; bridged via an embedded WebView reading a non-httpOnly
+cookie Mealie's own SPA sets). Also fixes a related dead end: `allowPasswordLogin: false` (SSO-only
+servers) previously meant the app couldn't log in at all, silently.
+- New dependency: `react-native-webview`. New component: `OidcLoginModal.tsx`.
+- `ConnectScreen` fetches `/api/app/about` on server-URL blur and conditionally shows password
+  fields / an OIDC button / both — fails open to password fields on any unknown/unreachable case,
+  confirmed by re-reading the full diff before shipping (this touches the login screen every user
+  goes through, so a regression here would be far worse than in a single feature screen).
+- **NOT verified live** — no OIDC-enabled Mealie server was available to test against, and no
+  device was connected this session (Ken accepted the risk and verified via Play Store update
+  instead, same as the previous session's redirect fix). `npx expo install --check` clean, Gradle
+  build succeeded, `react-native-webview` linked without error. If SSO login is reported broken,
+  start with the SSO section in the API Reference above.
+
+**Still open**: a user also asked for "language support" — ambiguous between translating the
+app's own UI (large effort: ~500+ strings across ~15 screens, needs an i18n library +
+device-locale detection + a language list) and expanding recipe/import-time language handling
+(smaller — there's already a `translateLanguage` param on image-import). Ken said both are wanted;
+blocked on knowing which languages to prioritize before starting the UI-translation half — not
+started yet.
+
+Both releases: `npx tsc --noEmit` clean throughout. Shipped all three surfaces each time (GitHub
+repo pushed, GitHub Release with signed APK cut and verified via `apksigner verify --print-certs`,
+AAB built) — Ken uploads the AAB to Play Console himself.
 
 ### Session 2026-07-17 (part 3) — self-healing retry for POST-downgraded-to-GET on redirect, v1.2.1
 A different user reported "Import from URL" failing with `405: {"detail":"Method Not Allowed"}`
@@ -892,6 +977,10 @@ All source files scaffolded and ready for `npm install + prebuild`:
   camera capture ever breaks again with this exact error, confirm `expo-file-system` is still in
   `package.json` and a clean prebuild (`npx expo prebuild --platform android --clean`) has run
   since.
+- react-native-webview — added 2026-07-18 for SSO/OIDC login (`OidcLoginModal.tsx`, see SSO / OIDC
+  login section above). Installed via `npx expo install`; linked and built cleanly (`npx expo
+  install --check` clean, Gradle build succeeded) but **not exercised on a physical device** this
+  session — no device was connected when this shipped.
 
 ### Known issues / TODO
 - No offline caching yet (Mealient had Room DB; we could add AsyncStorage caching later)
