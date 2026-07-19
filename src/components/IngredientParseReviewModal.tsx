@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/mealieApi';
 import { colors, radius, spacing, typography } from '../theme';
 import FoodOrUnitPicker from './FoodOrUnitPicker';
@@ -46,6 +47,7 @@ type PickerField = 'food' | 'unit';
 // up/down buttons rather than drag gestures (no new native dependency),
 // same end result as Mealie's drag-to-reorder step.
 export default function IngredientParseReviewModal({ visible, ingredientLines, onCancel, onComplete }: Props) {
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<Phase>('loading');
   const [errorMsg, setErrorMsg] = useState('');
   const [parsed, setParsed] = useState<ParsedIngredient[]>([]);
@@ -74,7 +76,7 @@ export default function IngredientParseReviewModal({ visible, ingredientLines, o
         setPhase(needsReview.length > 0 ? 'review' : 'reorder');
       })
       .catch(e => {
-        setErrorMsg(e instanceof Error ? e.message : 'Could not parse ingredients');
+        setErrorMsg(e instanceof Error ? e.message : t('ingredientReview.genericParseError'));
         setPhase('error');
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,18 +161,20 @@ export default function IngredientParseReviewModal({ visible, ingredientLines, o
         <Text style={styles.fieldLabel}>{label}</Text>
         <View style={styles.fieldValue}>
           {matched ? (
-            <Text style={styles.matchedText}>✓ {guessedName}</Text>
+            <Text style={styles.matchedText}>{t('ingredientReview.matchedText', { name: guessedName })}</Text>
           ) : guessedName ? (
-            <Text style={styles.unmatchedText}>⚠ "{guessedName}" (new)</Text>
+            <Text style={styles.unmatchedText}>{t('ingredientReview.unmatchedText', { name: guessedName })}</Text>
           ) : (
-            <Text style={styles.noneText}>None detected</Text>
+            <Text style={styles.noneText}>{t('ingredientReview.noneDetected')}</Text>
           )}
         </View>
         <TouchableOpacity
           style={styles.fieldActionBtn}
           onPress={() => setPicker({ field, initialQuery: guessedName ?? '' })}
         >
-          <Text style={styles.fieldActionText}>{matched ? 'Change' : guessedName ? 'Resolve' : 'Add'}</Text>
+          <Text style={styles.fieldActionText}>
+            {matched ? t('ingredientReview.changeButton') : guessedName ? t('ingredientReview.resolveButton') : t('ingredientReview.addButton')}
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -181,16 +185,16 @@ export default function IngredientParseReviewModal({ visible, ingredientLines, o
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onCancel}>
-            <Text style={styles.cancel}>Cancel</Text>
+            <Text style={styles.cancel}>{t('common.cancel')}</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Parse Ingredients</Text>
+          <Text style={styles.title}>{t('ingredientReview.title')}</Text>
           <View style={{ width: 60 }} />
         </View>
 
         {phase === 'loading' && (
           <View style={styles.centered}>
             <ActivityIndicator color={colors.primary} size="large" />
-            <Text style={styles.loadingText}>Parsing ingredients…</Text>
+            <Text style={styles.loadingText}>{t('ingredientReview.parsingText')}</Text>
           </View>
         )}
 
@@ -198,37 +202,39 @@ export default function IngredientParseReviewModal({ visible, ingredientLines, o
           <View style={styles.centered}>
             <Text style={styles.errorText}>{errorMsg}</Text>
             <TouchableOpacity onPress={onCancel}>
-              <Text style={styles.retryText}>Close</Text>
+              <Text style={styles.retryText}>{t('ingredientReview.close')}</Text>
             </TouchableOpacity>
           </View>
         )}
 
         {phase === 'review' && currentParsed && currentIngredient && (
           <View style={styles.reviewContainer}>
-            <Text style={styles.progressText}>Ingredient {reviewPos + 1} of {reviewQueue.length}</Text>
+            <Text style={styles.progressText}>
+              {t('ingredientReview.progressText', { current: reviewPos + 1, total: reviewQueue.length })}
+            </Text>
             <View style={styles.reviewCard}>
-              <Text style={styles.originalLabel}>Original text</Text>
+              <Text style={styles.originalLabel}>{t('ingredientReview.originalLabel')}</Text>
               <Text style={styles.originalText}>{currentParsed.input}</Text>
 
               <Text style={styles.confidenceText}>
-                Confidence: {Math.round((currentParsed.confidence.average ?? 0) * 100)}%
+                {t('ingredientReview.confidenceText', { percent: Math.round((currentParsed.confidence.average ?? 0) * 100) })}
               </Text>
 
               <View style={styles.divider} />
 
               <View style={styles.fieldRow}>
-                <Text style={styles.fieldLabel}>Quantity</Text>
+                <Text style={styles.fieldLabel}>{t('ingredientReview.quantityLabel')}</Text>
                 <Text style={styles.fieldValueText}>{currentIngredient.quantity ?? '—'}</Text>
               </View>
-              {renderFieldRow('Unit', 'unit', currentIngredient.unit)}
-              {renderFieldRow('Food', 'food', currentIngredient.food)}
+              {renderFieldRow(t('ingredientReview.unitLabel'), 'unit', currentIngredient.unit)}
+              {renderFieldRow(t('ingredientReview.foodLabel'), 'food', currentIngredient.food)}
               <View style={styles.fieldRow}>
-                <Text style={styles.fieldLabel}>Note</Text>
+                <Text style={styles.fieldLabel}>{t('ingredientReview.noteLabel')}</Text>
                 <TextInput
                   style={styles.noteInput}
                   value={currentIngredient.note ?? ''}
                   onChangeText={updateCurrentNote}
-                  placeholder="Add a note (optional)"
+                  placeholder={t('ingredientReview.notePlaceholder')}
                   placeholderTextColor={colors.textDisabled}
                 />
               </View>
@@ -236,10 +242,10 @@ export default function IngredientParseReviewModal({ visible, ingredientLines, o
 
             <View style={styles.reviewActions}>
               <TouchableOpacity style={styles.keepTextBtn} onPress={() => advanceReview(false)}>
-                <Text style={styles.keepTextBtnText}>Keep as Text</Text>
+                <Text style={styles.keepTextBtnText}>{t('ingredientReview.keepAsText')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.acceptBtn} onPress={() => advanceReview(true)}>
-                <Text style={styles.acceptBtnText}>Accept & Continue</Text>
+                <Text style={styles.acceptBtnText}>{t('ingredientReview.acceptContinue')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -247,7 +253,7 @@ export default function IngredientParseReviewModal({ visible, ingredientLines, o
 
         {phase === 'reorder' && (
           <>
-            <Text style={styles.reorderHint}>Reorder or remove any lines, then save.</Text>
+            <Text style={styles.reorderHint}>{t('ingredientReview.reorderHint')}</Text>
             <ScrollView contentContainerStyle={styles.reorderList}>
               {resolved.map((ing, i) => (
                 <View key={i} style={styles.reorderRow}>
@@ -267,7 +273,7 @@ export default function IngredientParseReviewModal({ visible, ingredientLines, o
               ))}
             </ScrollView>
             <TouchableOpacity style={styles.saveBtn} onPress={() => onComplete(resolved)}>
-              <Text style={styles.saveBtnText}>Save {resolved.length} Ingredient{resolved.length === 1 ? '' : 's'}</Text>
+              <Text style={styles.saveBtnText}>{t('ingredientReview.saveButton', { count: resolved.length })}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -276,7 +282,7 @@ export default function IngredientParseReviewModal({ visible, ingredientLines, o
       {picker && (
         <FoodOrUnitPicker
           visible
-          title={picker.field === 'food' ? 'Pick a Food' : 'Pick a Unit'}
+          title={picker.field === 'food' ? t('ingredientReview.pickFoodTitle') : t('ingredientReview.pickUnitTitle')}
           initialQuery={picker.initialQuery}
           search={async (q: string) => {
             const data = picker.field === 'food' ? await api.getFoods(q) : await api.getUnits(q);

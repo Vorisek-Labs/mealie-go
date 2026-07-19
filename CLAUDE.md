@@ -441,13 +441,23 @@ remaining screen gets migrated the same way.
   covering the "From Recipes"/"From Meal Plan" flows and duplicate-merge pluralized strings),
   `CookbooksScreen` + `CookbookDetailScreen` (`"cookbooks"` namespace; the detail screen reuses
   `recipes.emptySearchTitle`/`emptySearchSubtitle`/`genericRandomError` for its search/filter/
-  random-recipe states instead of duplicating identical English copy). Ken asked to keep going
-  toward full app coverage (2026-07-19) — this is an active, ongoing, screen-by-screen effort, not
-  finished; check git log / this section for the current frontier before assuming a screen is done.
-  Still untranslated: `IngredientParseReviewModal`, `RecipeDetailScreen` (~1093 lines),
-  `RecipeEditScreen` (~875 lines) — that's the planned order, largest/most complex screens last.
+  random-recipe states instead of duplicating identical English copy). As of v1.5.4:
+  `IngredientParseReviewModal` (`"ingredientReview"` namespace) and `RecipeDetailScreen`
+  (`"recipeDetail"` namespace, ~1093 lines — the largest screen translated so far). Ken asked to
+  keep going toward full app coverage (2026-07-19) — this is an active, ongoing, screen-by-screen
+  effort, not finished; check git log / this section for the current frontier before assuming a
+  screen is done. Still untranslated: `RecipeEditScreen` (~875 lines) — the last remaining screen.
   `GuideScreen`'s tip lists use `t(key, { returnObjects: true })` to get an array back instead of a
   string — needed any time a key's value is an array/object, not a plain string.
+- **PDF export content is translated too (v1.5.4)** — `RecipeDetailScreen.tsx`'s
+  `buildRecipePdfHtml()` is a plain function (not a component, can't use `useTranslation()`), same
+  situation as `lib/timeEstimate.ts`: imports the raw `i18n` default export and calls `i18n.t(...)`
+  directly. Since this file ALSO has a component that calls `useTranslation()`, its destructured
+  `i18n` (the per-component instance, used for `.language`) would otherwise shadow the
+  module-level `import i18n from '../i18n'` used by the plain function below it — renamed the
+  component's destructured value to `i18nInstance` to keep both usable side by side. Watch for the
+  same collision if another screen mixes a plain non-React helper function with `useTranslation()`
+  in the same file.
 - **`"common"` namespace (added v1.5.1)** holds words repeated across many screens (`cancel`,
   `clearAll`, `apply`/`applyWithCount`, `createOption`, `noMatchesCreateNew`, `searchOrTypeNew`) —
   reuse these in new screens instead of adding duplicate per-screen copies of "Cancel" etc. Older
@@ -683,6 +693,34 @@ At the end of every session, commit all changes AND update the Current Build Sta
 ## Current Build Status
 
 **Session (latest) — 2026-07-19**
+
+### Session 2026-07-19 (part 6) — translated ingredient-parse review and the recipe detail screen, v1.5.4
+Continuation of "keep going" toward full app-wide translation coverage — this is the largest single
+screen tackled so far.
+- Migrated `IngredientParseReviewModal` (`"ingredientReview"` namespace) and `RecipeDetailScreen`
+  (`"recipeDetail"` namespace, ~1093 lines) to `useTranslation()`, all 11 locales.
+- `RecipeDetailScreen` covers by far the most surface area translated in one screen: hero overlay
+  actions (favorite/edit/share/PDF), meta stats (prep/cook/total/yield/serves), nutrition labels,
+  all 4 tabs (ingredients/steps/notes/comments) and their empty states, the comment composer +
+  delete flow, the share-link modal, the add-to-shopping-list picker modal, attachments, and the
+  delete-recipe confirmation.
+- **PDF export content is now translated too** — `buildRecipePdfHtml()` is a plain function (not a
+  component), so it uses the same `import i18n from '../i18n'` + `i18n.t(...)` pattern already
+  established for `lib/timeEstimate.ts`. Since this file also has a component using
+  `useTranslation()`, its destructured `i18n` was renamed to `i18nInstance` to avoid shadowing the
+  module-level import — see the new Localization-section note above if another file needs the same
+  fix.
+- Found and fixed **three separate `t`-shadowing risks** while migrating this file (same bug class
+  already caught in `RecipeFilterModal` and `RecipeSuggestionsScreen`): a `.filter(t => t.id !== ...)`
+  callback, a `TABS.map(t => ...)` callback, and a `shareTokens.map(t => ...)` callback — all
+  renamed (`tok`, `tab`, `token`) before they could shadow the `t()` translation function.
+- **Also fixed**: comment timestamps and share-link expiry dates called `toLocaleDateString()` with
+  no locale argument (defaults to device locale, not the app's selected language) — same class of
+  bug as v1.5.3's meal-plan date-header fix. Both now pass `i18nInstance.language`.
+- `npx tsc --noEmit` clean across all 11 locale JSON files + both migrated files.
+- Built + verified release APK signed with the upload key via `apksigner verify --print-certs`.
+- NEEDS DEVICE TESTING: none of this batch's translated strings, including the PDF export and the
+  locale-aware date fixes, have had a live on-device pass in any non-English language yet.
 
 ### Session 2026-07-19 (part 5) — translated Meal Plan, Shopping, and Cookbooks tabs, v1.5.3
 Continuation of "keep going" toward full app-wide translation coverage — the next three tabs after

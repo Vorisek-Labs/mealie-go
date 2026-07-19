@@ -7,6 +7,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { useRecipeMedia } from '../hooks/useRecipeMedia';
@@ -70,11 +72,11 @@ function buildRecipePdfHtml(recipe: Recipe, imageTag: string): string {
   const cookTime = displayCookTime(recipe);
   const totalTime = formatTimeText(recipe.totalTime);
   const meta = [
-    prepTime ? `Prep: ${escapeHtml(prepTime)}` : '',
-    cookTime ? `Cook: ${escapeHtml(cookTime)}` : '',
-    totalTime ? `Total: ${escapeHtml(totalTime)}` : '',
-    recipe.recipeYield ? `Yield: ${escapeHtml(recipe.recipeYield)}` : '',
-    recipe.recipeServings ? `Serves: ${escapeHtml(formatQty(recipe.recipeServings))}` : '',
+    prepTime ? escapeHtml(i18n.t('time.prepLabel', { time: prepTime })) : '',
+    cookTime ? escapeHtml(i18n.t('time.cookLabel', { time: cookTime })) : '',
+    totalTime ? escapeHtml(i18n.t('recipeDetail.pdfTotalLabel', { time: totalTime })) : '',
+    recipe.recipeYield ? escapeHtml(i18n.t('recipeDetail.pdfYieldLabel', { value: recipe.recipeYield })) : '',
+    recipe.recipeServings ? escapeHtml(i18n.t('recipeDetail.pdfServesLabel', { count: formatQty(recipe.recipeServings) })) : '',
   ].filter(Boolean).join(' &nbsp;·&nbsp; ');
 
   return `
@@ -96,15 +98,16 @@ function buildRecipePdfHtml(recipe: Recipe, imageTag: string): string {
         <h1>${escapeHtml(recipe.name ?? '')}</h1>
         ${meta ? `<div class="meta">${meta}</div>` : ''}
         ${recipe.description ? `<div class="description">${escapeHtml(recipe.description)}</div>` : ''}
-        ${ingredients ? `<h2>Ingredients</h2><ul>${ingredients}</ul>` : ''}
-        ${steps ? `<h2>Instructions</h2><ol style="list-style:none;padding-left:0;">${steps}</ol>` : ''}
-        ${notes ? `<h2>Notes</h2>${notes}` : ''}
+        ${ingredients ? `<h2>${escapeHtml(i18n.t('recipeDetail.pdfIngredientsHeader'))}</h2><ul>${ingredients}</ul>` : ''}
+        ${steps ? `<h2>${escapeHtml(i18n.t('recipeDetail.pdfInstructionsHeader'))}</h2><ol style="list-style:none;padding-left:0;">${steps}</ol>` : ''}
+        ${notes ? `<h2>${escapeHtml(i18n.t('recipeDetail.pdfNotesHeader'))}</h2>${notes}` : ''}
       </body>
     </html>
   `;
 }
 
 export default function RecipeDetailScreen({ navigation, route }: Props) {
+  const { t, i18n: i18nInstance } = useTranslation();
   const { slug, name } = route.params;
   const { serverUrl, token, user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -224,11 +227,11 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
       setServings(base);
       setRating(data.rating ?? 0);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load recipe');
+      setError(e instanceof Error ? e.message : t('recipeDetail.genericLoadError'));
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, t]);
 
   // Refetches every time this screen regains focus, not just on first mount --
   // RecipeEditScreen is pushed onto the same stack and pops back via
@@ -282,24 +285,24 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
       setComments(prev => [...prev, created]);
       setNewComment('');
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not post comment');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('recipeDetail.genericCommentError'));
     } finally {
       setCommentSending(false);
     }
   };
 
   const handleDeleteComment = (comment: RecipeComment) => {
-    Alert.alert('Delete comment', 'Remove this comment?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('recipeDetail.deleteCommentTitle'), t('recipeDetail.deleteCommentMsg'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('recipeDetail.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             await api.deleteComment(comment.id);
             setComments(prev => prev.filter(c => c.id !== comment.id));
           } catch (e) {
-            Alert.alert('Error', e instanceof Error ? e.message : 'Could not delete');
+            Alert.alert(t('common.error'), e instanceof Error ? e.message : t('recipeDetail.genericDeleteCommentError'));
           }
         },
       },
@@ -333,7 +336,7 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
       const created = await api.createShareToken(recipe.id);
       setShareTokens(prev => [...prev, created]);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not create share link');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('recipeDetail.genericShareLinkError'));
     } finally {
       setCreatingToken(false);
     }
@@ -351,9 +354,9 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
   const handleDeleteShareToken = async (tokenId: string) => {
     try {
       await api.deleteShareToken(tokenId);
-      setShareTokens(prev => prev.filter(t => t.id !== tokenId));
+      setShareTokens(prev => prev.filter(tok => tok.id !== tokenId));
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not remove share link');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('recipeDetail.genericRemoveShareLinkError'));
     }
   };
 
@@ -385,10 +388,10 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
       } else {
-        Alert.alert('Exported', `PDF saved to ${uri}`);
+        Alert.alert(t('recipeDetail.exportedTitle'), t('recipeDetail.exportedMsg', { uri }));
       }
     } catch (e) {
-      Alert.alert('Export failed', e instanceof Error ? e.message : 'Could not export this recipe');
+      Alert.alert(t('recipeDetail.exportFailedTitle'), e instanceof Error ? e.message : t('recipeDetail.genericExportError'));
     } finally {
       setExportingPdf(false);
     }
@@ -414,26 +417,26 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
     try {
       await api.addRecipesToShoppingList(list.id, [recipe.id]);
       setShowListPicker(false);
-      Alert.alert('Added', `Added ingredients to "${list.name}".`);
+      Alert.alert(t('recipeDetail.addedTitle'), t('recipeDetail.addedToListMsg', { name: list.name }));
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not add to that list');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('recipeDetail.genericAddToListError'));
     } finally {
       setAddingToListId(null);
     }
   };
 
   const handleDelete = () => {
-    Alert.alert('Delete recipe', `Delete "${name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('recipeDetail.deleteRecipeTitle'), t('recipeDetail.deleteRecipeMsg', { name }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('recipeDetail.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             await api.deleteRecipe(slug);
             navigation.goBack();
           } catch (e) {
-            Alert.alert('Error', e instanceof Error ? e.message : 'Could not delete recipe');
+            Alert.alert(t('common.error'), e instanceof Error ? e.message : t('recipeDetail.genericDeleteRecipeError'));
           }
         },
       },
@@ -443,7 +446,7 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
   const openAsset = (fileName: string) => {
     if (!recipe) return;
     Linking.openURL(recipeAssetUrl(serverUrl, recipe.id, fileName)).catch(() =>
-      Alert.alert('Cannot open', 'Could not open this file.')
+      Alert.alert(t('recipeDetail.cannotOpenTitle'), t('recipeDetail.cannotOpenMsg'))
     );
   };
 
@@ -458,9 +461,9 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
   if (error || !recipe) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.errorText}>{error ?? 'Recipe not found'}</Text>
+        <Text style={styles.errorText}>{error ?? t('recipeDetail.notFound')}</Text>
         <TouchableOpacity onPress={load}>
-          <Text style={styles.retryText}>Retry</Text>
+          <Text style={styles.retryText}>{t('common.retry')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -483,10 +486,10 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
   const totalTimeDisplay = formatTimeText(recipe.totalTime);
 
   const TABS: { key: ActiveTab; label: string }[] = [
-    { key: 'ingredients', label: 'Ingredients' },
-    { key: 'steps', label: 'Steps' },
-    { key: 'notes', label: 'Notes' },
-    { key: 'comments', label: 'Comments' },
+    { key: 'ingredients', label: t('recipeDetail.tabIngredients') },
+    { key: 'steps', label: t('recipeDetail.tabSteps') },
+    { key: 'notes', label: t('recipeDetail.tabNotes') },
+    { key: 'comments', label: t('recipeDetail.tabComments') },
   ];
 
   const hasNutrition = recipe.nutrition && Object.values(recipe.nutrition).some(Boolean);
@@ -527,21 +530,21 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
 
         <View style={styles.overlayActions}>
           <TouchableOpacity style={styles.overlayBtn} onPress={() => toggleFavorite(recipe.id, slug)}>
-            <Text style={styles.overlayBtnText}>{favorite ? '♥ Saved' : '♡ Favorite'}</Text>
+            <Text style={styles.overlayBtnText}>{favorite ? t('recipeDetail.favoriteSaved') : t('recipeDetail.favoriteAdd')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.overlayBtn}
             onPress={() => navigation.navigate('RecipeEdit', { slug, name: recipe.name })}
           >
-            <Text style={styles.overlayBtnText}>Edit</Text>
+            <Text style={styles.overlayBtnText}>{t('recipeDetail.edit')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.overlayBtn} onPress={openShareModal}>
-            <Text style={styles.overlayBtnText}>Share</Text>
+            <Text style={styles.overlayBtnText}>{t('recipeDetail.share')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.overlayBtn} onPress={handleExportPdf} disabled={exportingPdf}>
             {exportingPdf
               ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={styles.overlayBtnText}>PDF</Text>
+              : <Text style={styles.overlayBtnText}>{t('recipeDetail.pdf')}</Text>
             }
           </TouchableOpacity>
         </View>
@@ -551,11 +554,11 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
 
           {(prepTimeDisplay || cookTimeDisplay || totalTimeDisplay || recipe.recipeYield || recipe.recipeServings) && (
             <View style={styles.metaRow}>
-              {prepTimeDisplay ? <MetaStat label="Prep" value={prepTimeDisplay} /> : null}
-              {cookTimeDisplay ? <MetaStat label="Cook" value={cookTimeDisplay} /> : null}
-              {totalTimeDisplay ? <MetaStat label="Total" value={totalTimeDisplay} /> : null}
-              {recipe.recipeYield ? <MetaStat label="Yield" value={recipe.recipeYield} /> : null}
-              {recipe.recipeServings ? <MetaStat label="Serves" value={formatQty(recipe.recipeServings)} /> : null}
+              {prepTimeDisplay ? <MetaStat label={t('recipeDetail.prepLabel')} value={prepTimeDisplay} /> : null}
+              {cookTimeDisplay ? <MetaStat label={t('recipeDetail.cookLabel')} value={cookTimeDisplay} /> : null}
+              {totalTimeDisplay ? <MetaStat label={t('recipeDetail.totalLabel')} value={totalTimeDisplay} /> : null}
+              {recipe.recipeYield ? <MetaStat label={t('recipeDetail.yieldLabel')} value={recipe.recipeYield} /> : null}
+              {recipe.recipeServings ? <MetaStat label={t('recipeDetail.servesLabel')} value={formatQty(recipe.recipeServings)} /> : null}
             </View>
           )}
 
@@ -567,28 +570,28 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
 
           {hasNutrition && recipe.nutrition && (
             <View style={styles.nutritionBox}>
-              <Text style={styles.nutritionTitle}>Nutrition</Text>
+              <Text style={styles.nutritionTitle}>{t('recipeDetail.nutritionTitle')}</Text>
               <View style={styles.nutritionGrid}>
-                {recipe.nutrition.calories ? <NutrStat label="Calories" value={recipe.nutrition.calories} /> : null}
-                {recipe.nutrition.proteinContent ? <NutrStat label="Protein" value={recipe.nutrition.proteinContent} /> : null}
-                {recipe.nutrition.carbohydrateContent ? <NutrStat label="Carbs" value={recipe.nutrition.carbohydrateContent} /> : null}
-                {recipe.nutrition.fatContent ? <NutrStat label="Fat" value={recipe.nutrition.fatContent} /> : null}
-                {recipe.nutrition.fiberContent ? <NutrStat label="Fiber" value={recipe.nutrition.fiberContent} /> : null}
-                {recipe.nutrition.sodiumContent ? <NutrStat label="Sodium" value={recipe.nutrition.sodiumContent} /> : null}
-                {recipe.nutrition.sugarContent ? <NutrStat label="Sugar" value={recipe.nutrition.sugarContent} /> : null}
+                {recipe.nutrition.calories ? <NutrStat label={t('recipeDetail.nutrCalories')} value={recipe.nutrition.calories} /> : null}
+                {recipe.nutrition.proteinContent ? <NutrStat label={t('recipeDetail.nutrProtein')} value={recipe.nutrition.proteinContent} /> : null}
+                {recipe.nutrition.carbohydrateContent ? <NutrStat label={t('recipeDetail.nutrCarbs')} value={recipe.nutrition.carbohydrateContent} /> : null}
+                {recipe.nutrition.fatContent ? <NutrStat label={t('recipeDetail.nutrFat')} value={recipe.nutrition.fatContent} /> : null}
+                {recipe.nutrition.fiberContent ? <NutrStat label={t('recipeDetail.nutrFiber')} value={recipe.nutrition.fiberContent} /> : null}
+                {recipe.nutrition.sodiumContent ? <NutrStat label={t('recipeDetail.nutrSodium')} value={recipe.nutrition.sodiumContent} /> : null}
+                {recipe.nutrition.sugarContent ? <NutrStat label={t('recipeDetail.nutrSugar')} value={recipe.nutrition.sugarContent} /> : null}
               </View>
             </View>
           )}
 
           <View style={styles.tabs}>
-            {TABS.map(t => (
+            {TABS.map(tab => (
               <TouchableOpacity
-                key={t.key}
-                style={[styles.tab, activeTab === t.key && styles.tabActive]}
-                onPress={() => setActiveTab(t.key)}
+                key={tab.key}
+                style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+                onPress={() => setActiveTab(tab.key)}
               >
-                <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>
-                  {t.label}
+                <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+                  {tab.label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -599,7 +602,7 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
               <View style={styles.ingredientToolbar}>
                 {hasScalableIngredients && (
                   <View style={styles.scaler}>
-                    <Text style={styles.scalerLabel}>Servings:</Text>
+                    <Text style={styles.scalerLabel}>{t('recipeDetail.servingsLabel')}</Text>
                     <TouchableOpacity
                       style={styles.scalerBtn}
                       onPress={() => setServings(s => Math.max(1, s - 1))}
@@ -617,15 +620,15 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
                 )}
                 <TouchableOpacity style={styles.unitToggle} onPress={toggleUnitSystem}>
                   <Text style={styles.unitToggleText}>
-                    {unitSystem === 'metric' ? 'Metric' : 'Original units'}
+                    {unitSystem === 'metric' ? t('recipeDetail.unitMetric') : t('recipeDetail.unitOriginal')}
                   </Text>
                 </TouchableOpacity>
               </View>
               <TouchableOpacity style={styles.addToListBtn} onPress={openListPicker}>
-                <Text style={styles.addToListBtnText}>🛒 Add Ingredients to Shopping List</Text>
+                <Text style={styles.addToListBtnText}>{t('recipeDetail.addToShoppingListButton')}</Text>
               </TouchableOpacity>
               {ingredientDisplayLines.length === 0 ? (
-                <Text style={styles.emptyText}>No ingredients listed</Text>
+                <Text style={styles.emptyText}>{t('recipeDetail.noIngredients')}</Text>
               ) : ingredientDisplayLines.map((displayText, i) => (
                 <View key={i}>
                   {recipe.recipeIngredient[i]?.title ? (
@@ -644,11 +647,11 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
             <View style={styles.section}>
               {recipe.recipeInstructions.length > 0 && (
                 <TouchableOpacity style={styles.addToListBtn} onPress={() => setShowCookMode(true)}>
-                  <Text style={styles.addToListBtnText}>👨‍🍳 Start Cooking</Text>
+                  <Text style={styles.addToListBtnText}>{t('recipeDetail.startCookingButton')}</Text>
                 </TouchableOpacity>
               )}
               {recipe.recipeInstructions.length === 0 ? (
-                <Text style={styles.emptyText}>No instructions listed</Text>
+                <Text style={styles.emptyText}>{t('recipeDetail.noInstructions')}</Text>
               ) : recipe.recipeInstructions.map((step, i) => (
                 <View key={i} style={styles.step}>
                   <View style={styles.stepNumber}>
@@ -668,7 +671,7 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
           {activeTab === 'notes' && (
             <View style={styles.section}>
               {recipe.notes.length === 0 ? (
-                <Text style={styles.emptyText}>No notes</Text>
+                <Text style={styles.emptyText}>{t('recipeDetail.noNotes')}</Text>
               ) : recipe.notes.map((note, i) => (
                 <View key={i} style={styles.note}>
                   {note.title ? <Text style={styles.noteTitle}>{note.title}</Text> : null}
@@ -685,7 +688,7 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
                   style={styles.commentTextInput}
                   value={newComment}
                   onChangeText={setNewComment}
-                  placeholder="Add a comment…"
+                  placeholder={t('recipeDetail.commentPlaceholder')}
                   placeholderTextColor={colors.textDisabled}
                   multiline
                 />
@@ -696,14 +699,14 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
                 >
                   {commentSending
                     ? <ActivityIndicator color={colors.textInverse} size="small" />
-                    : <Text style={styles.commentSendText}>Post</Text>
+                    : <Text style={styles.commentSendText}>{t('recipeDetail.postButton')}</Text>
                   }
                 </TouchableOpacity>
               </View>
               {commentsLoading ? (
                 <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
               ) : comments.length === 0 ? (
-                <Text style={styles.emptyText}>No comments yet — be the first!</Text>
+                <Text style={styles.emptyText}>{t('recipeDetail.noComments')}</Text>
               ) : comments.map(c => (
                 <TouchableOpacity
                   key={c.id}
@@ -712,10 +715,10 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
                 >
                   <View style={styles.commentHeader}>
                     <Text style={styles.commentAuthor}>
-                      {c.user?.fullName ?? c.user?.username ?? 'User'}
+                      {c.user?.fullName ?? c.user?.username ?? t('recipeDetail.unknownUser')}
                     </Text>
                     <Text style={styles.commentDate}>
-                      {new Date(c.createdAt).toLocaleDateString()}
+                      {new Date(c.createdAt).toLocaleDateString(i18nInstance.language)}
                     </Text>
                   </View>
                   <Text style={styles.commentText}>{c.text}</Text>
@@ -726,11 +729,11 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
 
           <View style={styles.assetsSection}>
             <View style={styles.assetsSectionHeader}>
-              <Text style={styles.assetsSectionTitle}>ATTACHMENTS</Text>
+              <Text style={styles.assetsSectionTitle}>{t('recipeDetail.attachmentsTitle')}</Text>
               <TouchableOpacity onPress={handleAddAttachment} disabled={attachmentUploading}>
                 {attachmentUploading
                   ? <ActivityIndicator color={colors.primary} size="small" />
-                  : <Text style={styles.assetAddText}>+ Add</Text>
+                  : <Text style={styles.assetAddText}>{t('recipeDetail.addAttachmentButton')}</Text>
                 }
               </TouchableOpacity>
             </View>
@@ -742,15 +745,15 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
               >
                 <Text style={styles.assetIcon}>📎</Text>
                 <Text style={styles.assetName} numberOfLines={1}>{asset.name || asset.fileName}</Text>
-                <Text style={styles.assetOpen}>Open ›</Text>
+                <Text style={styles.assetOpen}>{t('recipeDetail.openAction')}</Text>
               </TouchableOpacity>
             )) : (
-              <Text style={styles.emptyText}>No attachments yet</Text>
+              <Text style={styles.emptyText}>{t('recipeDetail.noAttachments')}</Text>
             )}
           </View>
 
           <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-            <Text style={styles.deleteButtonText}>Delete Recipe</Text>
+            <Text style={styles.deleteButtonText}>{t('recipeDetail.deleteRecipeButton')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -764,9 +767,9 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
         <View style={shareStyles.container}>
           <View style={shareStyles.header}>
             <TouchableOpacity onPress={() => setShowShareModal(false)}>
-              <Text style={shareStyles.close}>Close</Text>
+              <Text style={shareStyles.close}>{t('recipeDetail.close')}</Text>
             </TouchableOpacity>
-            <Text style={shareStyles.title}>Share Recipe</Text>
+            <Text style={shareStyles.title}>{t('recipeDetail.shareModalTitle')}</Text>
             <View style={{ width: 50 }} />
           </View>
 
@@ -777,29 +780,29 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
           >
             {creatingToken
               ? <ActivityIndicator color={colors.textInverse} size="small" />
-              : <Text style={shareStyles.newLinkBtnText}>+ New Share Link</Text>
+              : <Text style={shareStyles.newLinkBtnText}>{t('recipeDetail.newShareLinkButton')}</Text>
             }
           </TouchableOpacity>
 
           {shareTokensLoading ? (
             <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
           ) : shareTokens.length === 0 ? (
-            <Text style={styles.emptyText}>No share links yet — friends without an account can view this recipe with one.</Text>
+            <Text style={styles.emptyText}>{t('recipeDetail.noShareLinks')}</Text>
           ) : (
             <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.sm }}>
-              {shareTokens.map(t => (
-                <View key={t.id} style={shareStyles.tokenRow}>
-                  <TouchableOpacity style={{ flex: 1 }} onPress={() => handleShareToken(t.id)}>
+              {shareTokens.map(token => (
+                <View key={token.id} style={shareStyles.tokenRow}>
+                  <TouchableOpacity style={{ flex: 1 }} onPress={() => handleShareToken(token.id)}>
                     <Text style={shareStyles.tokenExpiry}>
-                      Expires {new Date(t.expiresAt).toLocaleDateString()}
+                      {t('recipeDetail.expiresLabel', { date: new Date(token.expiresAt).toLocaleDateString(i18nInstance.language) })}
                     </Text>
-                    <Text style={shareStyles.tokenLink} numberOfLines={1}>{shareTokenLink(t.id)}</Text>
+                    <Text style={shareStyles.tokenLink} numberOfLines={1}>{shareTokenLink(token.id)}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleShareToken(t.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={shareStyles.tokenAction}>Share</Text>
+                  <TouchableOpacity onPress={() => handleShareToken(token.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={shareStyles.tokenAction}>{t('recipeDetail.shareAction')}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDeleteShareToken(t.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={[shareStyles.tokenAction, { color: colors.error }]}>Remove</Text>
+                  <TouchableOpacity onPress={() => handleDeleteShareToken(token.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={[shareStyles.tokenAction, { color: colors.error }]}>{t('recipeDetail.removeAction')}</Text>
                   </TouchableOpacity>
                 </View>
               ))}
@@ -816,11 +819,11 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
       >
         <View style={listPickerStyles.overlay}>
           <View style={listPickerStyles.content}>
-            <Text style={listPickerStyles.title}>Add to Shopping List</Text>
+            <Text style={listPickerStyles.title}>{t('recipeDetail.addToShoppingListModalTitle')}</Text>
             {listPickerLoading ? (
               <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
             ) : shoppingLists.length === 0 ? (
-              <Text style={styles.emptyText}>No shopping lists yet — create one in the Shopping tab first.</Text>
+              <Text style={styles.emptyText}>{t('recipeDetail.noShoppingLists')}</Text>
             ) : (
               <ScrollView style={{ maxHeight: 300 }}>
                 {shoppingLists.map(list => (
@@ -840,7 +843,7 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
               </ScrollView>
             )}
             <TouchableOpacity style={listPickerStyles.cancelBtn} onPress={() => setShowListPicker(false)}>
-              <Text style={listPickerStyles.cancelBtnText}>Cancel</Text>
+              <Text style={listPickerStyles.cancelBtnText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>
