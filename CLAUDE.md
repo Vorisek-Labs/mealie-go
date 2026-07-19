@@ -348,8 +348,24 @@ WebView's *initial* request only — `react-native-webview`'s `headers` prop doe
 subsequent in-WebView navigations, a known library limitation, so a proxy header requirement that
 covers the OIDC provider's own domain (not just Mealie's) won't be honored past the first hop.
 
-**Not yet verified against a real OIDC-configured Mealie server** — none was available this session.
-If SSO login is reported broken, this whole section is the first place to check.
+**First live report (2026-07-18, Authentik provider)**: user saw the OIDC login complete inside the
+WebView (landed on Mealie's own logged-in interface) but the app never picked it up to finish
+signing in. Root cause not confirmed — couldn't reproduce without a live OIDC-enabled server, so
+`OidcLoginModal.tsx` was hardened against three plausible causes at once rather than guessing at
+one: (1) some Nuxt `useCookie` configs JSON-serialize a string value, wrapping it in literal quote
+characters, which would have produced a malformed `Bearer` token — both the poll and a new manual
+check now strip a single layer of wrapping quotes if present; (2) added a redundant check on every
+`onLoadEnd` in case the self-installing polling interval never got set up on a given page load
+(e.g. a full-page reload racing the injection); (3) added a manual **"I've signed in — Continue"**
+button, always visible/tappable independent of the loading overlay (which previously covered the
+whole modal), so a user is never stuck if the automatic detection misses the cookie — it also
+reports back "not signed in yet" distinctly from silence, giving a cleaner signal for next time.
+Also gave the `WebView` an explicit `flex: 1` style, which it never had.
+
+**Still not confirmed working end-to-end** — if reported broken again, check whether the manual
+button also fails (points at something more fundamental, e.g. cookie name/format actually differs
+on that Mealie version) vs. only the automatic poll failing (a timing/injection issue, already
+partially mitigated above). This whole section is the first place to check either way.
 
 ### Localization (i18n) — in progress, not a Mealie API
 Added 2026-07-18 after user feedback ("we need language support!"). This app's UI has ~15 screens
@@ -621,6 +637,18 @@ pre version check?"), which had only been researched, not built, earlier in the 
   coverage complete rather than leaving an English-only string in a partially-translated screen.
 - `npx tsc --noEmit` clean. Not verified on a physical device (same as parts 1–2 today). Bumped to
   `1.3.3`/versionCode `11`, shipped all three surfaces.
+
+### Session 2026-07-18 (part 4) — first live SSO report, hardened OidcLoginModal, v1.3.4
+A user (Authentik provider) updated to v1.3.0 and reported the exact untested risk flagged since
+that release: the OIDC login completes inside the WebView, but the app never finishes signing in.
+See the updated SSO / OIDC login section in the API Reference above for full detail. Couldn't
+reproduce without a live OIDC-enabled server, so hardened three plausible causes at once rather
+than guessing at one: cookie-value quote-stripping, a redundant per-page-load check, and a manual
+"I've signed in — Continue" fallback button that's always tappable (fixed a related layout bug
+where the loading overlay could have covered anything placed after it). Also gave the `WebView` an
+explicit `flex: 1` it never had. **Still not confirmed fixed** — asked the reporting user to try
+the manual button specifically, since whether that also fails is the key signal for what to check
+next. `npx tsc --noEmit` clean. Bumped to `1.3.4`/versionCode `12`, shipped all three surfaces.
 
 ### Session 2026-07-18 (part 1) — batch of user feedback: ingredient notes/sections, comments bug, SSO, v1.2.2 + v1.3.0 + v1.3.1
 Five pieces of user feedback arrived at once; triaged each before touching code rather than
