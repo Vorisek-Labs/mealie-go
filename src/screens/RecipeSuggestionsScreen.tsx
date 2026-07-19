@@ -4,6 +4,7 @@ import {
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/mealieApi';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
@@ -15,13 +16,15 @@ type Props = {
 };
 
 function Picker({
-  label, options, selected, onToggle,
+  label, searchPlaceholder, options, selected, onToggle,
 }: {
   label: string;
+  searchPlaceholder: string;
   options: { id: string; name: string }[];
   selected: Set<string>;
   onToggle: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const filtered = search.trim()
     ? options.filter(o => o.name.toLowerCase().includes(search.trim().toLowerCase()))
@@ -32,7 +35,7 @@ function Picker({
       <Text style={pickerStyles.label}>{label}</Text>
       <TextInput
         style={pickerStyles.search}
-        placeholder={`Search ${label.toLowerCase()}…`}
+        placeholder={searchPlaceholder}
         placeholderTextColor={colors.textDisabled}
         value={search}
         onChangeText={setSearch}
@@ -53,7 +56,7 @@ function Picker({
           );
         })}
         {filtered.length === 0 && (
-          <Text style={pickerStyles.emptyText}>No matches</Text>
+          <Text style={pickerStyles.emptyText}>{t('suggestions.noMatches')}</Text>
         )}
       </View>
     </View>
@@ -61,6 +64,7 @@ function Picker({
 }
 
 export default function RecipeSuggestionsScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const [foods, setFoods] = useState<RecipeFood[]>([]);
   const [tools, setTools] = useState<RecipeTool[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(true);
@@ -127,10 +131,10 @@ export default function RecipeSuggestionsScreen({ navigation }: Props) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.back}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>What Can I Make?</Text>
+        <Text style={styles.title}>{t('suggestions.title')}</Text>
         {!results && selectionCount > 0 ? (
           <TouchableOpacity onPress={handleClearAll}>
-            <Text style={styles.clearAll}>Clear All</Text>
+            <Text style={styles.clearAll}>{t('suggestions.clearAll')}</Text>
           </TouchableOpacity>
         ) : (
           <View style={{ width: 32 }} />
@@ -144,10 +148,10 @@ export default function RecipeSuggestionsScreen({ navigation }: Props) {
       ) : results ? (
         <>
           <TouchableOpacity style={styles.backToPicker} onPress={() => setResults(null)}>
-            <Text style={styles.backToPickerText}>‹ Change ingredients</Text>
+            <Text style={styles.backToPickerText}>{t('suggestions.changeIngredients')}</Text>
           </TouchableOpacity>
           {results.length === 0 ? (
-            <EmptyState icon="🥕" title="No matches" subtitle="Try selecting a few more ingredients or tools" />
+            <EmptyState icon="🥕" title={t('suggestions.emptyResultsTitle')} subtitle={t('suggestions.emptyResultsSubtitle')} />
           ) : (
             <FlatList
               data={results}
@@ -160,10 +164,12 @@ export default function RecipeSuggestionsScreen({ navigation }: Props) {
                 >
                   <Text style={styles.resultName}>{item.recipe.name}</Text>
                   {item.missingFoods.length === 0 && item.missingTools.length === 0 ? (
-                    <Text style={styles.haveEverything}>✓ You have everything for this</Text>
+                    <Text style={styles.haveEverything}>{t('suggestions.haveEverything')}</Text>
                   ) : (
                     <Text style={styles.missingText}>
-                      Missing: {[...item.missingFoods.map(f => f.name), ...item.missingTools.map(t => t.name)].join(', ')}
+                      {t('suggestions.missingLabel', {
+                        items: [...item.missingFoods.map(f => f.name), ...item.missingTools.map(tool => tool.name)].join(', '),
+                      })}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -175,17 +181,19 @@ export default function RecipeSuggestionsScreen({ navigation }: Props) {
         <>
           <ScrollView contentContainerStyle={styles.scroll}>
             <Text style={styles.intro}>
-              Select the ingredients and tools you have on hand, and we'll suggest recipes you can make.
+              {t('suggestions.intro')}
             </Text>
             <Picker
-              label="Ingredients"
+              label={t('suggestions.ingredientsLabel')}
+              searchPlaceholder={t('suggestions.ingredientsSearchPlaceholder')}
               options={foods.filter((f): f is RecipeFood & { id: string } => !!f.id)}
               selected={selectedFoods}
               onToggle={toggleFood}
             />
             <Picker
-              label="Tools"
-              options={tools.filter((t): t is RecipeTool & { id: string } => !!t.id)}
+              label={t('suggestions.toolsLabel')}
+              searchPlaceholder={t('suggestions.toolsSearchPlaceholder')}
+              options={tools.filter((tool): tool is RecipeTool & { id: string } => !!tool.id)}
               selected={selectedTools}
               onToggle={toggleTool}
             />
@@ -198,7 +206,9 @@ export default function RecipeSuggestionsScreen({ navigation }: Props) {
             {searching
               ? <ActivityIndicator color={colors.textInverse} size="small" />
               : <Text style={styles.findBtnText}>
-                  Find Recipes{selectionCount > 0 ? ` (${selectionCount} selected)` : ''}
+                  {selectionCount > 0
+                    ? t('suggestions.findRecipesWithCount', { count: selectionCount })
+                    : t('suggestions.findRecipes')}
                 </Text>
             }
           </TouchableOpacity>

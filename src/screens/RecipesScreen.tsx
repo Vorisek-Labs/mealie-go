@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { useRecipes } from '../hooks/useRecipes';
 import { useRecipeFilterOptions } from '../hooks/useRecipeFilterOptions';
 import type { RecipeFilters } from '../hooks/useRecipes';
@@ -26,6 +27,7 @@ type Props = {
 type FilterKey = keyof RecipeFilters;
 
 export default function RecipesScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const {
     recipes, loading, loadingMore, error, search, setSearch,
     refresh, loadMore, hasMore, filters, applyFilters, activeFilterCount,
@@ -83,10 +85,10 @@ export default function RecipesScreen({ navigation }: Props) {
         search: search || undefined,
         tags: filters.tags, categories: filters.categories, tools: filters.tools, foods: filters.foods,
       });
-      if (!recipe) { Alert.alert('No recipes found'); return; }
+      if (!recipe) { Alert.alert(t('recipes.noRecipesFoundAlert')); return; }
       navigation.navigate('RecipeDetail', { slug: recipe.slug, name: recipe.name });
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not pick a random recipe');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('recipes.genericRandomError'));
     } finally {
       setRandomizing(false);
     }
@@ -104,7 +106,7 @@ export default function RecipesScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Recipes</Text>
+        <Text style={styles.title}>{t('recipes.title')}</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={[styles.filterButton, favoritesOnly && styles.filterButtonActive]}
@@ -147,7 +149,7 @@ export default function RecipesScreen({ navigation }: Props) {
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search recipes…"
+          placeholder={t('recipes.searchPlaceholder')}
           placeholderTextColor={colors.textDisabled}
           value={search}
           onChangeText={setSearch}
@@ -168,7 +170,7 @@ export default function RecipesScreen({ navigation }: Props) {
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity onPress={refresh}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : showLoading ? (
@@ -178,10 +180,12 @@ export default function RecipesScreen({ navigation }: Props) {
       ) : displayedRecipes.length === 0 ? (
         <EmptyState
           icon={favoritesOnly ? '♡' : '🍽️'}
-          title={favoritesOnly ? 'No favorites yet' : search || activeFilterCount ? 'No recipes found' : 'No recipes yet'}
+          title={favoritesOnly
+            ? t('recipes.emptyFavoritesTitle')
+            : search || activeFilterCount ? t('recipes.emptySearchTitle') : t('recipes.emptyTitle')}
           subtitle={favoritesOnly
-            ? 'Tap the heart on a recipe to favorite it'
-            : search || activeFilterCount ? 'Try adjusting your search or filters' : 'Add your first recipe with the + button'}
+            ? t('recipes.emptyFavoritesSubtitle')
+            : search || activeFilterCount ? t('recipes.emptySearchSubtitle') : t('recipes.emptySubtitle')}
         />
       ) : (
         <FlatList
@@ -201,7 +205,7 @@ export default function RecipesScreen({ navigation }: Props) {
           ListFooterComponent={loadingMore
             ? <ActivityIndicator color={colors.primary} style={styles.footerLoader} />
             : (favoritesOnly || !hasMore) && displayedRecipes.length > 0
-              ? <Text style={styles.footerText}>{displayedRecipes.length} recipe{displayedRecipes.length === 1 ? '' : 's'}</Text>
+              ? <Text style={styles.footerText}>{t('recipes.footerCount', { count: displayedRecipes.length })}</Text>
               : null
           }
         />

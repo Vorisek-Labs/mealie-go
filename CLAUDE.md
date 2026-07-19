@@ -432,9 +432,14 @@ remaining screen gets migrated the same way.
   `WelcomeScreen` (the `"guide"`/`"welcome"` namespaces, added v1.5.0 — flagged as missed by a
   user, since these are the two onboarding/help screens and easy to overlook when only auth
   screens had been done), and as of v1.5.1: `RecipeFilterModal`, `FoodOrUnitPicker`,
-  `CookModeModal`, `ActiveFilterChips`, and `lib/timeEstimate.ts`. Ken asked to keep going toward
-  full app coverage (2026-07-19) — this is an active, ongoing, screen-by-screen effort, not
-  finished; check git log / this section for the current frontier before assuming a screen is done.
+  `CookModeModal`, `ActiveFilterChips`, and `lib/timeEstimate.ts`. As of v1.5.2: the Recipes-tab
+  flow — `RecipesScreen`, `AddRecipeScreen`, `RecipeSuggestionsScreen` (the `"recipes"`,
+  `"addRecipe"`, `"suggestions"` namespaces). Ken asked to keep going toward full app coverage
+  (2026-07-19) — this is an active, ongoing, screen-by-screen effort, not finished; check git log /
+  this section for the current frontier before assuming a screen is done. Still untranslated:
+  `MealPlanScreen`, `ShoppingListsScreen`, `ShoppingListDetailScreen`, `CookbooksScreen`,
+  `CookbookDetailScreen`, `IngredientParseReviewModal`, `RecipeDetailScreen` (~1093 lines),
+  `RecipeEditScreen` (~875 lines) — that's the planned order, largest/most complex screens last.
   `GuideScreen`'s tip lists use `t(key, { returnObjects: true })` to get an array back instead of a
   string — needed any time a key's value is an array/object, not a plain string.
 - **`"common"` namespace (added v1.5.1)** holds words repeated across many screens (`cancel`,
@@ -671,7 +676,26 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 ## Current Build Status
 
-**Session (latest) — 2026-07-18**
+**Session (latest) — 2026-07-19**
+
+### Session 2026-07-19 (part 4) — translated the Recipes-tab flow, v1.5.2
+Continuation of "keep going" toward full app-wide translation coverage.
+- Migrated `RecipesScreen`, `AddRecipeScreen`, `RecipeSuggestionsScreen` to `useTranslation()` —
+  new `"recipes"`, `"addRecipe"`, `"suggestions"` namespaces, all 11 locales.
+- `RecipeSuggestionsScreen`'s `Picker` sub-component now takes an explicit `searchPlaceholder` prop
+  instead of deriving it from `label.toLowerCase()` — locale-fragile (casing conventions differ),
+  and RTL/non-Latin scripts don't have a meaningful "lowercase" transform at all.
+- Renamed a `.map(t => t.name)` callback param to `tool` in the missing-ingredients/tools line —
+  same class of `t`-shadowing bug already caught once in `RecipeFilterModal`; caught proactively
+  here before it ever compiled wrong.
+- See Localization section above for the updated list of translated vs. still-untranslated screens.
+- `npx tsc --noEmit` clean across all 11 locale JSON files + the 3 migrated screens.
+- Built + verified release APK signed with the upload key (`CN=Vorisek Labs, OU=Mealie Go`) via
+  `apksigner verify --print-certs` — note `jarsigner -verify` alone reports "jar is unsigned" for
+  these APKs, a known false negative since modern Android Gradle Plugin output uses the v2/v3
+  signature scheme, which jarsigner doesn't check; `apksigner` is the correct tool going forward.
+- NEEDS DEVICE TESTING: none of this batch's translated strings have had a live on-device pass in
+  any non-English language yet.
 
 ### Session 2026-07-18 (part 2) — stale recipe view after edit, dead disableAmount field, v1.3.2
 User reported: "adding an ingredient to an existing recipe manually and it's not displaying, but
