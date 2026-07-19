@@ -428,12 +428,28 @@ remaining screen gets migrated the same way.
   starting point, not verified-correct copy. If a user reports a translation is wrong or awkward,
   that's expected until someone fluent reviews it.
 - Translated surfaces so far: `ConnectScreen` (incl. proxy-header + API-token sections),
-  `SettingsScreen`, `OidcLoginModal` (the `"oidc"` namespace, added v1.4.0), and `GuideScreen` +
+  `SettingsScreen`, `OidcLoginModal` (the `"oidc"` namespace, added v1.4.0), `GuideScreen` +
   `WelcomeScreen` (the `"guide"`/`"welcome"` namespaces, added v1.5.0 — flagged as missed by a
   user, since these are the two onboarding/help screens and easy to overlook when only auth
-  screens had been done). `GuideScreen`'s tip lists use `t(key, { returnObjects: true })` to get
-  an array back instead of a string — needed any time a key's value is an array/object, not a
-  plain string.
+  screens had been done), and as of v1.5.1: `RecipeFilterModal`, `FoodOrUnitPicker`,
+  `CookModeModal`, `ActiveFilterChips`, and `lib/timeEstimate.ts`. Ken asked to keep going toward
+  full app coverage (2026-07-19) — this is an active, ongoing, screen-by-screen effort, not
+  finished; check git log / this section for the current frontier before assuming a screen is done.
+  `GuideScreen`'s tip lists use `t(key, { returnObjects: true })` to get an array back instead of a
+  string — needed any time a key's value is an array/object, not a plain string.
+- **`"common"` namespace (added v1.5.1)** holds words repeated across many screens (`cancel`,
+  `clearAll`, `apply`/`applyWithCount`, `createOption`, `noMatchesCreateNew`, `searchOrTypeNew`) —
+  reuse these in new screens instead of adding duplicate per-screen copies of "Cancel" etc. Older
+  already-shipped screens (`oidc.cancel`, `settings.cancel`) predate this and weren't retrofitted;
+  harmless duplication, not worth churning.
+- **Translating a plain (non-React) lib file** — `lib/timeEstimate.ts` needs strings (time labels)
+  but can't use the `useTranslation()` hook since it's not a component. Pattern: `import i18n from
+  '../i18n'` (the raw i18next instance, exported as default) and call `i18n.t(...)` directly. Only
+  safe because everything that DISPLAYS these strings is itself a translated component that
+  re-renders on language change, which re-invokes the formatting function with the new language —
+  a **static const computed once at module load would freeze at whatever language was active
+  then**; that's why `TIME_BUCKETS` became a `getTimeBuckets()` function instead. Apply the same
+  fix if another plain lib file needs translating.
 - **Arabic and Urdu are RTL languages, and only their text content is translated so far** — actual
   right-to-left layout mirroring (`I18nManager.forceRTL()`) is not implemented. RN requires an app
   restart for an RTL flip to visually take effect (it can't be applied to an already-mounted tree),
@@ -730,6 +746,18 @@ login section above for exactly what `reason` values the manual check now report
   locale file, not just a formality — always re-run it after touching locale JSON by hand.
 - `npx tsc --noEmit` clean. Not device-tested (no device connected). Bumped to `1.4.1`/versionCode
   `14`, shipped all three surfaces.
+
+### Session 2026-07-19 (part 3) — translated shared components, v1.5.1
+Ken: "let's keep going then, i want full translations everywhere." Surveyed remaining scope first
+(`wc -l` across all screens/components — ~6,800 lines, ~20 files still English-only) and set
+expectations that this spans several more releases, not one. This round: the shared
+pieces used across multiple screens rather than a single feature area — `RecipeFilterModal`,
+`FoodOrUnitPicker`, `CookModeModal`, `ActiveFilterChips`, and `lib/timeEstimate.ts` (see the new
+Localization-section notes above for the `"common"` namespace and the non-React-lib translation
+pattern). `npx tsc --noEmit` clean; not device-tested. Bumped to `1.5.1`/versionCode `17`, shipped
+all three surfaces. **Next up**: the Recipes tab flow (`RecipesScreen`, `AddRecipeScreen`,
+`RecipeSuggestionsScreen`), then Meal Plan, Shopping, Cookbooks, then the two largest screens last
+(`RecipeDetailScreen` ~1093 lines, `RecipeEditScreen` ~875 lines).
 
 ### Session 2026-07-19 (part 2) — translated the Guide + Welcome screens, v1.5.0
 Ken: "for the languages, it doesn't look like you translated the help guides. those need to be
