@@ -348,24 +348,48 @@ WebView's *initial* request only — `react-native-webview`'s `headers` prop doe
 subsequent in-WebView navigations, a known library limitation, so a proxy header requirement that
 covers the OIDC provider's own domain (not just Mealie's) won't be honored past the first hop.
 
-**First live report (2026-07-18, Authentik provider)**: user saw the OIDC login complete inside the
-WebView (landed on Mealie's own logged-in interface) but the app never picked it up to finish
-signing in. Root cause not confirmed — couldn't reproduce without a live OIDC-enabled server, so
-`OidcLoginModal.tsx` was hardened against three plausible causes at once rather than guessing at
-one: (1) some Nuxt `useCookie` configs JSON-serialize a string value, wrapping it in literal quote
-characters, which would have produced a malformed `Bearer` token — both the poll and a new manual
-check now strip a single layer of wrapping quotes if present; (2) added a redundant check on every
-`onLoadEnd` in case the self-installing polling interval never got set up on a given page load
-(e.g. a full-page reload racing the injection); (3) added a manual **"I've signed in — Continue"**
-button, always visible/tappable independent of the loading overlay (which previously covered the
-whole modal), so a user is never stuck if the automatic detection misses the cookie — it also
-reports back "not signed in yet" distinctly from silence, giving a cleaner signal for next time.
-Also gave the `WebView` an explicit `flex: 1` style, which it never had.
+**Field history — how the detection strategy evolved (important context before touching this):**
+- v1.3.0 read `document.cookie` for `mealie.access_token`. First live report (2026-07-18,
+  Authentik): login visibly completed inside the WebView, app never picked it up.
+- v1.3.4 hardened the cookie read (quote-stripping, redundant per-load check, a manual
+  "I've signed in — Continue" button). Same user reported the **manual button also failed** —
+  proving `document.cookie` genuinely cannot see the session on their setup, ruling out timing.
+- v1.4.0 (current): after a proper deep-dive into Mealie's docs/source (at Ken's direction —
+  research before another guess), the cookie is now **never read at all**. Two findings made a
+  version-proof approach possible:
+  1. **Mealie's backend accepts the auth cookie in lieu of an `Authorization` header on every
+     version checked** — `get_current_user` in `mealie/core/dependencies/dependencies.py` falls
+     back to `request.cookies["mealie.access_token"]`, both in current code and in pre-Nov-2025
+     versions.
+  2. **Cookie mechanics genuinely changed between versions users run**: commit `07ecd886`
+     ("Remove backend cookie and use frontend for auth", #6601, Nov 2025) moved cookie-setting
+     from backend `Set-Cookie` to frontend JS — so httpOnly-ness/flags/behavior vary by server
+     version, and proxies can rewrite cookie flags on top of that. Reading `document.cookie` is
+     structurally fragile; asking the server isn't.
+  So `OidcLoginModal.tsx`'s injected JS now fetches `{serverUrl}/api/auth/refresh` from inside the
+  page with `credentials: 'include'` — the WebView attaches whatever session cookie exists, in
+  whatever form (httpOnly included), and the JSON response yields a fresh `access_token` that
+  injected JS can always read. Origin-guarded (`location.origin` vs. the server URL's origin) so
+  probes no-op on the identity provider's pages mid-redirect; the fetch uses the full `serverUrl`
+  as base so Mealie `SUB_PATH` installs work. The 2s poll, the per-`onLoadEnd` check, and the
+  manual button all share this one mechanism.
 
-**Still not confirmed working end-to-end** — if reported broken again, check whether the manual
-button also fails (points at something more fundamental, e.g. cookie name/format actually differs
-on that Mealie version) vs. only the automatic poll failing (a timing/injection issue, already
-partially mitigated above). This whole section is the first place to check either way.
+**API-token sign-in (v1.4.0)** — the guaranteed path for SSO users, independent of the WebView
+entirely: Mealie's documented third-party mechanism is long-lived API tokens (web UI → user
+profile → API Tokens; 5-year JWTs created by `mealie/routes/users/api_tokens.py`, validated by the
+same `get_current_user` path as any Bearer token — confirmed in source). ConnectScreen has a
+collapsed "Sign in with an API token instead?" section (mirrors the proxy-header pattern); the
+pasted token goes through `completeTokenSignIn()` (renamed from `handleOidcSuccess` — shared by
+the OIDC modal's success path, since both flows end the same way: a bearer token validated via
+`api.getSelf()`). Note: `AuthContext`'s 6-hourly silent refresh will swap a pasted 5-year token
+for a normal short-lived one on first refresh — session behavior thereafter matches a password
+login; acceptable, just not obvious.
+
+**Still not confirmed working end-to-end** (no OIDC test server available), but v1.4.0's approach
+is grounded in confirmed backend behavior rather than assumptions about cookie storage — and the
+API-token path works regardless. If the refresh-probe approach is reported broken too, get the
+user's exact Mealie server version first; `/api/auth/refresh` + cookie fallback existing on their
+version is the thing to verify.
 
 ### Localization (i18n) — in progress, not a Mealie API
 Added 2026-07-18 after user feedback ("we need language support!"). This app's UI has ~15 screens
@@ -385,21 +409,25 @@ remaining screen gets migrated the same way.
   translation. Every internal step (AsyncStorage read, `Localization.getLocales()`, `i18next.init`)
   is individually try/caught with an English fallback, plus a defensive `.catch()` at the call site
   in `App.tsx` as a second line of defense. Keep this property if you touch this file.
-- 10 languages as of this writing: English (baseline/source of truth for keys), Chinese
+- 11 languages as of 2026-07-18: English (baseline/source of truth for keys), Chinese
   (Simplified), Hindi, Spanish, French, Arabic, Bengali, Russian, Portuguese, Urdu — chosen as "top
-  10 world languages by total speakers" per Ken's request, not by this app's actual userbase. **All
-  9 non-English files are AI-translated, not yet reviewed by a native speaker of each language** —
-  treat as a reasonable starting point, not verified-correct copy. If a user reports a translation
-  is wrong or awkward, that's expected until someone fluent reviews it.
+  10 world languages by total speakers" per Ken's request, not by this app's actual userbase —
+  plus **German, added by direct user request** (v1.4.0). **All non-English files are
+  AI-translated, not yet reviewed by a native speaker of each language** — treat as a reasonable
+  starting point, not verified-correct copy. If a user reports a translation is wrong or awkward,
+  that's expected until someone fluent reviews it.
+- Translated surfaces so far: `ConnectScreen` (incl. proxy-header + API-token sections),
+  `SettingsScreen`, and `OidcLoginModal` (the `"oidc"` namespace, added v1.4.0).
 - **Arabic and Urdu are RTL languages, and only their text content is translated so far** — actual
   right-to-left layout mirroring (`I18nManager.forceRTL()`) is not implemented. RN requires an app
   restart for an RTL flip to visually take effect (it can't be applied to an already-mounted tree),
   which will need its own dedicated implementation + testing pass, not a small add-on.
 - To migrate another screen: add its keys to `src/i18n/locales/en.json` under a new top-level
-  namespace (e.g. `"recipes": {...}`, matching the `"connect"`/`"settings"` pattern already there),
-  add the same keys to all 9 other locale files, then swap the screen's hardcoded strings for
-  `t('namespace.key')` via `useTranslation()`. Do this screen-by-screen, not as one giant sweep —
-  it's much easier to review and verify a handful of screens at a time than the whole app at once.
+  namespace (e.g. `"recipes": {...}`, matching the `"connect"`/`"settings"`/`"oidc"` pattern
+  already there), add the same keys to all 10 other locale files, then swap the screen's hardcoded
+  strings for `t('namespace.key')` via `useTranslation()`. Do this screen-by-screen, not as one
+  giant sweep — it's much easier to review and verify a handful of screens at a time than the
+  whole app at once.
 
 ### Custom proxy headers — not a Mealie API, a reverse-proxy concern
 Added 2026-07-17 after user feedback: some self-hosted setups put Mealie behind a reverse proxy
@@ -637,6 +665,24 @@ pre version check?"), which had only been researched, not built, earlier in the 
   coverage complete rather than leaving an English-only string in a partially-translated screen.
 - `npx tsc --noEmit` clean. Not verified on a physical device (same as parts 1–2 today). Bumped to
   `1.3.3`/versionCode `11`, shipped all three surfaces.
+
+### Session 2026-07-18 (part 5) — researched OIDC rework, API-token sign-in, German, v1.4.0
+The Authentik user came back on v1.3.4: **the manual button also fails** ("even after being logged
+in, it just tells me to keep pressing it") — proving `document.cookie` genuinely can't see the
+session on their setup, ruling out timing. Ken's explicit direction: **deep-dive Mealie's docs
+before another guess, to limit back-and-forth with a generous reporter.** The research paid off —
+see the rewritten SSO / OIDC login section above for the two findings (backend accepts cookie auth
+on every version; cookie mechanics changed between versions in Nov 2025's #6601) and the resulting
+version-proof detection: injected JS now asks the server (`/api/auth/refresh` with credentials)
+instead of ever reading the cookie.
+- Also shipped **API-token sign-in** on ConnectScreen (Mealie's documented third-party mechanism,
+  guaranteed to work for SSO users independent of the WebView — confirmed in `api_tokens.py`) and
+  **German** as the 11th language (requested by the same user), including translating
+  `OidcLoginModal` itself (was hardcoded English) across all 11 locales.
+- `npx tsc --noEmit` clean; not device-tested (no device connected; same accepted risk as all of
+  today). Bumped to `1.4.0`/versionCode `13`, shipped all three surfaces. Release notes ask the
+  user to include their Mealie server version if SSO still fails, and point at the API-token path
+  as the works-regardless option.
 
 ### Session 2026-07-18 (part 4) — first live SSO report, hardened OidcLoginModal, v1.3.4
 A user (Authentik provider) updated to v1.3.0 and reported the exact untested risk flagged since
