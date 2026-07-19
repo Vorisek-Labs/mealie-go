@@ -36,7 +36,12 @@ export interface ProxyHeader {
 function headersToRecord(headers: ProxyHeader[]): Record<string, string> {
   const record: Record<string, string> = {};
   for (const h of headers) {
-    if (h.name.trim()) record[h.name.trim()] = h.value;
+    // Trim the value too, not just the name -- a pasted API key/token with
+    // invisible leading/trailing whitespace (very easy to pick up copying
+    // from a web page, terminal, or password manager) would otherwise be
+    // sent byte-for-byte wrong, and most reverse proxies do an exact-match
+    // check on header values, so a single stray space silently breaks it.
+    if (h.name.trim()) record[h.name.trim()] = h.value.trim();
   }
   return record;
 }
@@ -294,8 +299,34 @@ export async function login(
   }
 
   if (!res.ok) {
-    const data = await res.json().catch(() => null);
-    throw new Error(data?.detail ?? 'Invalid username or password');
+    const text = await res.text().catch(() => '');
+    let parsed: { detail?: unknown } | undefined;
+    let isJson = true;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      isJson = false;
+    }
+
+    if (isJson && typeof parsed?.detail === 'string') {
+      // A real message from Mealie itself -- e.g. "User is locked out"
+      // after too many failed attempts (HTTP 423).
+      throw new Error(parsed.detail);
+    }
+    if (isJson) {
+      // Valid JSON but no usable detail -- this is what Mealie's own auth
+      // handler returns for a plain wrong username/password (a bare 401
+      // with no detail message), so keep the friendly, expected message.
+      throw new Error('Invalid username or password');
+    }
+    // Not JSON at all -- this response didn't come from Mealie's own auth
+    // handler, which always returns JSON. Most likely something in front
+    // of the server (a reverse proxy, WAF, or load balancer) rejected the
+    // request before Mealie ever saw it -- e.g. a missing/wrong proxy
+    // header, an IP allowlist, or a block page. Showing "invalid username
+    // or password" here would be actively misleading, since the actual
+    // credentials were never checked.
+    throw new Error(`${res.status}: ${text.slice(0, 300) || res.statusText}`);
   }
   const data = await res.json();
   return { token: data.access_token as string, serverUrl: resolvedBase };
