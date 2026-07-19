@@ -38,7 +38,8 @@
     "cancel": "Cancel",
     "manualContinue": "I've signed in — Continue",
     "notSignedInTitle": "Not signed in yet",
-    "notSignedInMsg": "Finish signing in above, then tap \"I've signed in — Continue\" again."
+    "notSignedInMsg": "Finish signing in above, then tap \"I've signed in — Continue\" again.",
+    "diagnosticLabel": "Details"
   },
   "settings": {
     "title": "Settings",

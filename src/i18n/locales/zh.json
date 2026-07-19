@@ -38,7 +38,8 @@
     "cancel": "取消",
     "manualContinue": "我已登录 — 继续",
     "notSignedInTitle": "尚未登录",
-    "notSignedInMsg": "请先在上方完成登录，然后再次点按“我已登录”。"
+    "notSignedInMsg": "请先在上方完成登录，然后再次点按“我已登录”。",
+    "diagnosticLabel": "详情"
   },
   "settings": {
     "title": "设置",

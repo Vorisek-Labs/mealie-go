@@ -38,7 +38,8 @@
     "cancel": "Cancelar",
     "manualContinue": "Já entrei — Continuar",
     "notSignedInTitle": "Ainda não conectado",
-    "notSignedInMsg": "Conclua o login acima e toque novamente em \"Já entrei\"."
+    "notSignedInMsg": "Conclua o login acima e toque novamente em \"Já entrei\".",
+    "diagnosticLabel": "Detalhes"
   },
   "settings": {
     "title": "Configurações",

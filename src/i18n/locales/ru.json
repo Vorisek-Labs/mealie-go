@@ -38,7 +38,8 @@
     "cancel": "Отмена",
     "manualContinue": "Я вошёл — продолжить",
     "notSignedInTitle": "Вход ещё не выполнен",
-    "notSignedInMsg": "Завершите вход выше, затем снова нажмите «Я вошёл»."
+    "notSignedInMsg": "Завершите вход выше, затем снова нажмите «Я вошёл».",
+    "diagnosticLabel": "Подробности"
   },
   "settings": {
     "title": "Настройки",

@@ -38,7 +38,8 @@
     "cancel": "Abbrechen",
     "manualContinue": "Ich habe mich angemeldet — Weiter",
     "notSignedInTitle": "Noch nicht angemeldet",
-    "notSignedInMsg": "Schließe die Anmeldung oben ab und tippe dann erneut auf „Ich habe mich angemeldet“."
+    "notSignedInMsg": "Schließe die Anmeldung oben ab und tippe dann erneut auf „Ich habe mich angemeldet“.",
+    "diagnosticLabel": "Details"
   },
   "settings": {
     "title": "Einstellungen",

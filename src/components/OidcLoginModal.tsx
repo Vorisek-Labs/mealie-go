@@ -28,29 +28,42 @@ interface Props {
 //
 // Both scripts are origin-guarded: they no-op on the identity provider's
 // own pages mid-redirect, and only probe once the WebView is back on the
-// Mealie origin.
+// Mealie origin. The 'manual' variant additionally reports back WHY it
+// didn't find a session (wrong origin, HTTP status, network error, or an
+// unexpected response shape) -- if this rework also fails in the field,
+// the point is to get a real diagnosis from that report instead of another
+// round of guessing blind.
 function buildProbe(serverUrl: string, expectedOrigin: string, kind: 'poll' | 'manual'): string {
   return `
 (function() {
-  var notFound = function() {
+  var reportNotFound = function(reason) {
     if ('${kind}' === 'manual') {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'not-found' }));
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'not-found', reason: reason }));
     }
   };
-  if (window.location.origin !== ${JSON.stringify(expectedOrigin)}) { notFound(); return; }
+  if (window.location.origin !== ${JSON.stringify(expectedOrigin)}) {
+    reportNotFound('wrong-origin: currently on ' + window.location.href.slice(0, 200));
+    return;
+  }
   fetch(${JSON.stringify(serverUrl)} + '/api/auth/refresh', {
     credentials: 'include',
     headers: { 'Accept': 'application/json' }
   })
-    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(r) {
+      if (!r.ok) { reportNotFound('http-' + r.status + ' ' + r.statusText); return { __handled: true }; }
+      return r.json();
+    })
     .then(function(data) {
+      if (data && data.__handled) return;
       if (data && data.access_token) {
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'token', token: data.access_token, via: '${kind}' }));
       } else {
-        notFound();
+        reportNotFound('unexpected-response: ' + JSON.stringify(data).slice(0, 150));
       }
     })
-    .catch(notFound);
+    .catch(function(e) {
+      reportNotFound('fetch-error: ' + (e && e.message ? e.message : String(e)));
+    });
 })();
 true;
 `;
@@ -112,7 +125,15 @@ export default function OidcLoginModal({ serverUrl, proxyHeaders, providerName, 
         doneRef.current = true;
         onSuccess(data.token);
       } else if (data?.type === 'not-found') {
-        Alert.alert(t('oidc.notSignedInTitle'), t('oidc.notSignedInMsg'));
+        // `reason` is diagnostic text (origin/HTTP status/error message),
+        // deliberately not translated -- if this gets relayed back in a bug
+        // report, it needs to stay legible to whoever reads it here, not
+        // roundtrip through translation first.
+        const reason = typeof data.reason === 'string' ? data.reason : 'unknown';
+        Alert.alert(
+          t('oidc.notSignedInTitle'),
+          `${t('oidc.notSignedInMsg')}\n\n${t('oidc.diagnosticLabel')}: ${reason}`
+        );
       }
     } catch {
       // Ignore malformed messages -- nothing else posts to this bridge.

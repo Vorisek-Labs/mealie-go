@@ -38,7 +38,8 @@
     "cancel": "Cancelar",
     "manualContinue": "Ya inicié sesión — Continuar",
     "notSignedInTitle": "Aún no has iniciado sesión",
-    "notSignedInMsg": "Termina de iniciar sesión arriba y vuelve a pulsar «Ya inicié sesión»."
+    "notSignedInMsg": "Termina de iniciar sesión arriba y vuelve a pulsar «Ya inicié sesión».",
+    "diagnosticLabel": "Detalles"
   },
   "settings": {
     "title": "Ajustes",

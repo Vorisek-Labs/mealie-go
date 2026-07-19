@@ -38,7 +38,8 @@
     "cancel": "Annuler",
     "manualContinue": "Je me suis connecté — Continuer",
     "notSignedInTitle": "Pas encore connecté",
-    "notSignedInMsg": "Terminez la connexion ci-dessus, puis appuyez à nouveau sur « Je me suis connecté »."
+    "notSignedInMsg": "Terminez la connexion ci-dessus, puis appuyez à nouveau sur « Je me suis connecté ».",
+    "diagnosticLabel": "Détails"
   },
   "settings": {
     "title": "Paramètres",
