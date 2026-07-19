@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useShoppingLists } from '../hooks/useShoppingLists';
 import { navigateToGuide } from '../navigation/navigateToGuide';
 import EmptyState from '../components/EmptyState';
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export default function ShoppingListsScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const { lists, loading, error, refresh, createList, deleteList } = useShoppingLists();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
@@ -32,23 +34,23 @@ export default function ShoppingListsScreen({ navigation }: Props) {
       setNewName('');
       setShowCreate(false);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not create list');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('shopping.genericCreateError'));
     } finally {
       setCreating(false);
     }
   };
 
   const handleDelete = (id: string, name: string) => {
-    Alert.alert('Delete list', `Delete "${name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteList(id) },
+    Alert.alert(t('shopping.deleteListTitle'), t('shopping.deleteListMsg', { name }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('shopping.delete'), style: 'destructive', onPress: () => deleteList(id) },
     ]);
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Shopping</Text>
+        <Text style={styles.title}>{t('shopping.title')}</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.guideButton}
@@ -69,10 +71,10 @@ export default function ShoppingListsScreen({ navigation }: Props) {
       ) : error ? (
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={refresh}><Text style={styles.retryText}>Retry</Text></TouchableOpacity>
+          <TouchableOpacity onPress={refresh}><Text style={styles.retryText}>{t('common.retry')}</Text></TouchableOpacity>
         </View>
       ) : lists.length === 0 ? (
-        <EmptyState icon="🛒" title="No shopping lists" subtitle="Tap + to create your first list" />
+        <EmptyState icon="🛒" title={t('shopping.emptyTitle')} subtitle={t('shopping.emptySubtitle')} />
       ) : (
         <FlatList
           data={lists}
@@ -98,10 +100,10 @@ export default function ShoppingListsScreen({ navigation }: Props) {
       <Modal visible={showCreate} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>New Shopping List</Text>
+            <Text style={styles.modalTitle}>{t('shopping.newListTitle')}</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="List name"
+              placeholder={t('shopping.listNamePlaceholder')}
               placeholderTextColor={colors.textDisabled}
               value={newName}
               onChangeText={setNewName}
@@ -110,7 +112,7 @@ export default function ShoppingListsScreen({ navigation }: Props) {
             />
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => { setShowCreate(false); setNewName(''); }}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalConfirm, creating && styles.buttonDisabled]}
@@ -119,7 +121,7 @@ export default function ShoppingListsScreen({ navigation }: Props) {
               >
                 {creating
                   ? <ActivityIndicator color={colors.textInverse} size="small" />
-                  : <Text style={styles.modalConfirmText}>Create</Text>
+                  : <Text style={styles.modalConfirmText}>{t('shopping.create')}</Text>
                 }
               </TouchableOpacity>
             </View>

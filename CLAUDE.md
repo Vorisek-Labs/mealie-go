@@ -434,11 +434,17 @@ remaining screen gets migrated the same way.
   screens had been done), and as of v1.5.1: `RecipeFilterModal`, `FoodOrUnitPicker`,
   `CookModeModal`, `ActiveFilterChips`, and `lib/timeEstimate.ts`. As of v1.5.2: the Recipes-tab
   flow — `RecipesScreen`, `AddRecipeScreen`, `RecipeSuggestionsScreen` (the `"recipes"`,
-  `"addRecipe"`, `"suggestions"` namespaces). Ken asked to keep going toward full app coverage
-  (2026-07-19) — this is an active, ongoing, screen-by-screen effort, not finished; check git log /
-  this section for the current frontier before assuming a screen is done. Still untranslated:
-  `MealPlanScreen`, `ShoppingListsScreen`, `ShoppingListDetailScreen`, `CookbooksScreen`,
-  `CookbookDetailScreen`, `IngredientParseReviewModal`, `RecipeDetailScreen` (~1093 lines),
+  `"addRecipe"`, `"suggestions"` namespaces). As of v1.5.3: the Meal Plan, Shopping, and Cookbooks
+  tabs — `MealPlanScreen` (`"mealPlan"` namespace, including day-of-week abbreviations and the
+  add-entry modal's date header, which now formats via `i18n.language` instead of a hardcoded
+  `'en'` locale), `ShoppingListsScreen` + `ShoppingListDetailScreen` (`"shopping"` namespace,
+  covering the "From Recipes"/"From Meal Plan" flows and duplicate-merge pluralized strings),
+  `CookbooksScreen` + `CookbookDetailScreen` (`"cookbooks"` namespace; the detail screen reuses
+  `recipes.emptySearchTitle`/`emptySearchSubtitle`/`genericRandomError` for its search/filter/
+  random-recipe states instead of duplicating identical English copy). Ken asked to keep going
+  toward full app coverage (2026-07-19) — this is an active, ongoing, screen-by-screen effort, not
+  finished; check git log / this section for the current frontier before assuming a screen is done.
+  Still untranslated: `IngredientParseReviewModal`, `RecipeDetailScreen` (~1093 lines),
   `RecipeEditScreen` (~875 lines) — that's the planned order, largest/most complex screens last.
   `GuideScreen`'s tip lists use `t(key, { returnObjects: true })` to get an array back instead of a
   string — needed any time a key's value is an array/object, not a plain string.
@@ -677,6 +683,34 @@ At the end of every session, commit all changes AND update the Current Build Sta
 ## Current Build Status
 
 **Session (latest) — 2026-07-19**
+
+### Session 2026-07-19 (part 5) — translated Meal Plan, Shopping, and Cookbooks tabs, v1.5.3
+Continuation of "keep going" toward full app-wide translation coverage — the next three tabs after
+Recipes, per the order set in v1.5.2's notes.
+- Migrated `MealPlanScreen`, `ShoppingListsScreen`, `ShoppingListDetailScreen`, `CookbooksScreen`,
+  `CookbookDetailScreen` to `useTranslation()` — new `"mealPlan"`, `"shopping"`, `"cookbooks"`
+  namespaces, all 11 locales.
+- `MealPlanScreen`'s day-of-week strip (`DAYS` const) and meal-type labels (`MEAL_TYPE_LABELS`
+  const) were hardcoded English arrays/records read directly in JSX — converted to
+  `t('mealPlan.days', { returnObjects: true })` and a `useMemo`'d lookup built from per-key `t()`
+  calls, same pattern as `GuideScreen`'s tip lists and `RecipeSuggestionsScreen`'s meal labels.
+- **Also fixed**: the add-entry modal's date header (`"Mon, Jan 5"` style) called
+  `toLocaleDateString('en', {...})` with a hardcoded locale — every other string on the screen
+  would have been translated while this one stayed English regardless of language. Now passes
+  `i18n.language` from `useTranslation()` instead. Worth checking for the same hardcoded-`'en'`
+  pattern if another screen formats dates going forward.
+- `ShoppingListDetailScreen` has the most pluralized strings translated so far in one screen
+  (merge-duplicates confirm/result messages, the "Add N Recipe(s)" button) — used full CLDR
+  `_one`/`_few`/`_many`/`_other` forms for Russian, `_one`/`_other` for the other 2-form languages,
+  `_other`-only for Chinese/Arabic, matching the convention established for `recipes.footerCount`.
+- `CookbookDetailScreen` reuses `recipes.*` keys instead of duplicating identical English strings
+  (`emptySearchTitle`/`emptySearchSubtitle` for its search/filter-active empty state,
+  `genericRandomError` for its random-recipe button) — same "common"-namespace-style reuse
+  discipline as before, just cross-namespace instead of a shared namespace.
+- `npx tsc --noEmit` clean across all 11 locale JSON files + all 5 migrated screens.
+- Built + verified release APK signed with the upload key via `apksigner verify --print-certs`.
+- NEEDS DEVICE TESTING: none of this batch's translated strings, including the locale-aware date
+  formatting fix, have had a live on-device pass in any non-English language yet.
 
 ### Session 2026-07-19 (part 4) — translated the Recipes-tab flow, v1.5.2
 Continuation of "keep going" toward full app-wide translation coverage.

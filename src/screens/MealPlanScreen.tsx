@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, FlatList, Modal, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useMealPlan } from '../hooks/useMealPlan';
 import { api } from '../lib/mealieApi';
 import { navigateToGuide } from '../navigation/navigateToGuide';
@@ -11,13 +12,12 @@ import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
 import type { MealPlanEntry, MealPlanEntryType, RecipeSummary } from '../types';
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MEAL_TYPES: MealPlanEntryType[] = ['breakfast', 'lunch', 'dinner', 'side'];
-const MEAL_TYPE_LABELS: Record<MealPlanEntryType, string> = {
-  breakfast: 'Breakfast',
-  lunch: 'Lunch',
-  dinner: 'Dinner',
-  side: 'Side / Snack',
+const MEAL_TYPE_KEYS: Record<MealPlanEntryType, string> = {
+  breakfast: 'mealPlan.mealTypes.breakfast',
+  lunch: 'mealPlan.mealTypes.lunch',
+  dinner: 'mealPlan.mealTypes.dinner',
+  side: 'mealPlan.mealTypes.side',
 };
 
 function addDays(date: Date, days: number): Date {
@@ -40,9 +40,19 @@ function isoDate(date: Date): string {
 type AddMode = 'recipe' | 'note';
 
 export default function MealPlanScreen() {
+  const { t, i18n } = useTranslation();
   const navigation = useNavigation();
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(0);
+
+  const dayLabels = t('mealPlan.days', { returnObjects: true }) as string[];
+  const mealTypeLabels = useMemo(
+    () => MEAL_TYPES.reduce<Record<string, string>>((acc, type) => {
+      acc[type] = t(MEAL_TYPE_KEYS[type]);
+      return acc;
+    }, {}),
+    [t]
+  );
 
   const today = new Date();
   const weekStart = addDays(mondayOfWeek(today), weekOffset * 7);
@@ -97,7 +107,7 @@ export default function MealPlanScreen() {
       await addEntry({ date: selectedDate, entryType: addMealType, recipeId: recipe.id });
       setShowAdd(false);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not add to plan');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('mealPlan.genericAddError'));
     } finally {
       setAdding(false);
     }
@@ -110,7 +120,7 @@ export default function MealPlanScreen() {
       await addEntry({ date: selectedDate, entryType: addMealType, title: noteText.trim() });
       setShowAdd(false);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not add note');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('mealPlan.genericAddNoteError'));
     } finally {
       setAdding(false);
     }
@@ -120,21 +130,25 @@ export default function MealPlanScreen() {
     setAdding(true);
     try {
       const recipe = await api.getRandomRecipe();
-      if (!recipe) { Alert.alert('No recipes found'); return; }
+      if (!recipe) { Alert.alert(t('mealPlan.noRecipesFoundAlert')); return; }
       await addEntry({ date: selectedDate, entryType: addMealType, recipeId: recipe.id });
       setShowAdd(false);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not add random recipe');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('mealPlan.genericRandomError'));
     } finally {
       setAdding(false);
     }
   };
 
   const handleDelete = (entry: MealPlanEntry) => {
-    Alert.alert('Remove from plan', `Remove "${entry.recipe?.name ?? entry.title}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => removeEntry(entry.id) },
-    ]);
+    Alert.alert(
+      t('mealPlan.removeFromPlanTitle'),
+      t('mealPlan.removeFromPlanMsg', { name: entry.recipe?.name ?? entry.title }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('mealPlan.remove'), style: 'destructive', onPress: () => removeEntry(entry.id) },
+      ]
+    );
   };
 
   return (
@@ -146,7 +160,7 @@ export default function MealPlanScreen() {
             <Text style={styles.navArrow}>‹</Text>
           </TouchableOpacity>
           <Text style={styles.weekLabel}>
-            {weekOffset === 0 ? 'This Week' : weekOffset === 1 ? 'Next Week' : weekOffset === -1 ? 'Last Week' : isoDate(weekStart)}
+            {weekOffset === 0 ? t('mealPlan.thisWeek') : weekOffset === 1 ? t('mealPlan.nextWeek') : weekOffset === -1 ? t('mealPlan.lastWeek') : isoDate(weekStart)}
           </Text>
           <TouchableOpacity onPress={() => setWeekOffset(w => w + 1)}>
             <Text style={styles.navArrow}>›</Text>
@@ -162,7 +176,7 @@ export default function MealPlanScreen() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayStrip} contentContainerStyle={styles.dayStripContent}>
-        {DAYS.map((day, i) => {
+        {dayLabels.map((day, i) => {
           const date = addDays(weekStart, i);
           const isToday = isoDate(date) === isoDate(today);
           const hasEntries = entries.some(e => e.date === isoDate(date));
@@ -189,29 +203,29 @@ export default function MealPlanScreen() {
       ) : error ? (
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={refresh}><Text style={styles.retryText}>Retry</Text></TouchableOpacity>
+          <TouchableOpacity onPress={refresh}><Text style={styles.retryText}>{t('common.retry')}</Text></TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.planList}>
           {MEAL_TYPES.map(type => (
             <View key={type} style={styles.mealSection}>
               <View style={styles.mealSectionHeader}>
-                <Text style={styles.mealType}>{MEAL_TYPE_LABELS[type]}</Text>
+                <Text style={styles.mealType}>{mealTypeLabels[type]}</Text>
                 <TouchableOpacity style={styles.addMealBtn} onPress={() => openAdd(type)}>
                   <Text style={styles.addMealBtnText}>+</Text>
                 </TouchableOpacity>
               </View>
               {entriesByType[type].length === 0 ? (
                 <TouchableOpacity style={styles.emptyMealSlot} onPress={() => openAdd(type)}>
-                  <Text style={styles.emptyMealText}>Tap to add</Text>
+                  <Text style={styles.emptyMealText}>{t('mealPlan.tapToAdd')}</Text>
                 </TouchableOpacity>
               ) : entriesByType[type].map(entry => (
                 <View key={entry.id} style={[styles.mealEntry, entry.recipeId ? null : styles.mealEntryNote]}>
                   <Text style={styles.mealName}>
-                    {entry.recipe?.name ?? entry.title ?? 'Untitled'}
+                    {entry.recipe?.name ?? entry.title ?? t('mealPlan.untitled')}
                   </Text>
                   {!entry.recipeId && (
-                    <Text style={styles.noteTag}>note</Text>
+                    <Text style={styles.noteTag}>{t('mealPlan.noteTag')}</Text>
                   )}
                   <TouchableOpacity onPress={() => handleDelete(entry)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <Text style={styles.removeText}>✕</Text>
@@ -228,10 +242,10 @@ export default function MealPlanScreen() {
         <View style={addStyles.container}>
           <View style={addStyles.header}>
             <TouchableOpacity onPress={() => setShowAdd(false)}>
-              <Text style={addStyles.cancel}>Cancel</Text>
+              <Text style={addStyles.cancel}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <Text style={addStyles.title}>
-              {MEAL_TYPE_LABELS[addMealType]} — {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' })}
+              {mealTypeLabels[addMealType]} — {new Date(selectedDate + 'T12:00:00').toLocaleDateString(i18n.language, { weekday: 'short', month: 'short', day: 'numeric' })}
             </Text>
             <View style={{ width: 60 }} />
           </View>
@@ -241,13 +255,13 @@ export default function MealPlanScreen() {
               style={[addStyles.modeBtn, addMode === 'recipe' && addStyles.modeBtnActive]}
               onPress={() => setAddMode('recipe')}
             >
-              <Text style={[addStyles.modeBtnText, addMode === 'recipe' && addStyles.modeBtnTextActive]}>Recipe</Text>
+              <Text style={[addStyles.modeBtnText, addMode === 'recipe' && addStyles.modeBtnTextActive]}>{t('mealPlan.modeRecipe')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[addStyles.modeBtn, addMode === 'note' && addStyles.modeBtnActive]}
               onPress={() => setAddMode('note')}
             >
-              <Text style={[addStyles.modeBtnText, addMode === 'note' && addStyles.modeBtnTextActive]}>Note</Text>
+              <Text style={[addStyles.modeBtnText, addMode === 'note' && addStyles.modeBtnTextActive]}>{t('mealPlan.modeNote')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -259,7 +273,7 @@ export default function MealPlanScreen() {
                   style={addStyles.searchInput}
                   value={recipeSearch}
                   onChangeText={handleRecipeSearch}
-                  placeholder="Search for a recipe…"
+                  placeholder={t('mealPlan.searchPlaceholder')}
                   placeholderTextColor={colors.textDisabled}
                   autoFocus
                 />
@@ -267,7 +281,7 @@ export default function MealPlanScreen() {
 
               <TouchableOpacity style={addStyles.randomBtn} onPress={handleRandom} disabled={adding}>
                 <Text style={addStyles.randomBtnText}>
-                  {adding ? '…' : '🎲 Surprise Me — pick a random recipe'}
+                  {adding ? '…' : t('mealPlan.surpriseMe')}
                 </Text>
               </TouchableOpacity>
 
@@ -280,8 +294,8 @@ export default function MealPlanScreen() {
                   contentContainerStyle={addStyles.resultsList}
                   ListEmptyComponent={
                     recipeSearch.trim()
-                      ? <Text style={addStyles.emptyText}>No recipes found</Text>
-                      : <Text style={addStyles.emptyText}>Type to search your recipes</Text>
+                      ? <Text style={addStyles.emptyText}>{t('mealPlan.noRecipesFound')}</Text>
+                      : <Text style={addStyles.emptyText}>{t('mealPlan.typeToSearch')}</Text>
                   }
                   renderItem={({ item }) => (
                     <TouchableOpacity
@@ -298,12 +312,12 @@ export default function MealPlanScreen() {
             </View>
           ) : (
             <View style={addStyles.noteMode}>
-              <Text style={addStyles.noteLabel}>Note title</Text>
+              <Text style={addStyles.noteLabel}>{t('mealPlan.noteTitleLabel')}</Text>
               <TextInput
                 style={addStyles.noteInput}
                 value={noteText}
                 onChangeText={setNoteText}
-                placeholder="e.g. Leftovers, Dining out, Fasting…"
+                placeholder={t('mealPlan.notePlaceholder')}
                 placeholderTextColor={colors.textDisabled}
                 autoFocus
               />
@@ -314,7 +328,7 @@ export default function MealPlanScreen() {
               >
                 {adding
                   ? <ActivityIndicator color={colors.textInverse} />
-                  : <Text style={addStyles.addNoteBtnText}>Add Note</Text>
+                  : <Text style={addStyles.addNoteBtnText}>{t('mealPlan.addNoteButton')}</Text>
                 }
               </TouchableOpacity>
             </View>

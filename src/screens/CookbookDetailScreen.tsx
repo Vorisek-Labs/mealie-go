@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, FlatList } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useNavigation, NavigationProp } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useRecipes } from '../hooks/useRecipes';
 import { useRecipeFilterOptions } from '../hooks/useRecipeFilterOptions';
 import type { RecipeFilters } from '../hooks/useRecipes';
@@ -22,6 +23,7 @@ type Props = {
 type FilterKey = keyof RecipeFilters;
 
 export default function CookbookDetailScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   const { slug, name } = route.params;
   const {
     recipes, loading, loadingMore, error, search, setSearch,
@@ -60,10 +62,10 @@ export default function CookbookDetailScreen({ navigation, route }: Props) {
         search: search || undefined,
         tags: filters.tags, categories: filters.categories, tools: filters.tools, foods: filters.foods,
       });
-      if (!recipe) { Alert.alert('No recipes found in this cookbook'); return; }
+      if (!recipe) { Alert.alert(t('cookbooks.noRecipesFoundInCookbookAlert')); return; }
       openRecipe(recipe);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not pick a random recipe');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('recipes.genericRandomError'));
     } finally {
       setRandomizing(false);
     }
@@ -98,7 +100,7 @@ export default function CookbookDetailScreen({ navigation, route }: Props) {
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search this cookbook…"
+          placeholder={t('cookbooks.searchPlaceholder')}
           placeholderTextColor={colors.textDisabled}
           value={search}
           onChangeText={setSearch}
@@ -122,13 +124,13 @@ export default function CookbookDetailScreen({ navigation, route }: Props) {
       ) : error ? (
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={refresh}><Text style={styles.retryText}>Retry</Text></TouchableOpacity>
+          <TouchableOpacity onPress={refresh}><Text style={styles.retryText}>{t('common.retry')}</Text></TouchableOpacity>
         </View>
       ) : recipes.length === 0 ? (
         <EmptyState
           icon="📖"
-          title={search || activeFilterCount ? 'No recipes found' : 'No recipes'}
-          subtitle={search || activeFilterCount ? 'Try adjusting your search or filters' : 'Add recipes to this cookbook in Mealie'}
+          title={search || activeFilterCount ? t('recipes.emptySearchTitle') : t('cookbooks.noRecipesTitle')}
+          subtitle={search || activeFilterCount ? t('recipes.emptySearchSubtitle') : t('cookbooks.noRecipesSubtitle')}
         />
       ) : (
         <FlatList

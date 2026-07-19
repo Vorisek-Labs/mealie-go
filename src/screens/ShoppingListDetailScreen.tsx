@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useShoppingListDetail } from '../hooks/useShoppingLists';
 import { api } from '../lib/mealieApi';
 import { findPossibleMatchIds } from '../lib/shoppingMatch';
@@ -36,6 +37,7 @@ function isoDate(date: Date): string {
 type GroupedSection = { label: { id: string; name: string; color?: string } | null; items: ShoppingListItem[] };
 
 export default function ShoppingListDetailScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   const { listId, listName } = route.params;
   const {
     list, labels, loading, error, refresh,
@@ -66,17 +68,21 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
       setNewItem('');
       setNewQty('');
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not add item');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('shopping.genericAddItemError'));
     } finally {
       setAdding(false);
     }
   };
 
   const handleDelete = (item: ShoppingListItem) => {
-    Alert.alert('Remove item', `Remove "${item.display ?? item.note ?? item.food?.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => deleteItem(item.id) },
-    ]);
+    Alert.alert(
+      t('shopping.removeItemTitle'),
+      t('shopping.removeItemMsg', { name: item.display ?? item.note ?? item.food?.name }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('shopping.remove'), style: 'destructive', onPress: () => deleteItem(item.id) },
+      ]
+    );
   };
 
   const handleGenerateFromMealPlan = async () => {
@@ -86,9 +92,9 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
     setGenerating(true);
     try {
       await generateFromMealPlan(isoDate(start), isoDate(end));
-      Alert.alert('Done', "This week's meal plan ingredients were added.");
+      Alert.alert(t('shopping.doneTitle'), t('shopping.mealPlanAddedMsg'));
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not generate from meal plan');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('shopping.genericMealPlanError'));
     } finally {
       setGenerating(false);
     }
@@ -133,24 +139,28 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
       await addRecipes([...selectedRecipeIds]);
       setShowAddRecipes(false);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not add recipes to this list');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('shopping.genericAddRecipesError'));
     } finally {
       setAddingRecipes(false);
     }
   };
 
   const handleMergeDuplicates = async () => {
-    Alert.alert('Merge duplicates', `Remove ${duplicateCount} duplicate item${duplicateCount > 1 ? 's' : ''}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Merge',
-        style: 'destructive',
-        onPress: async () => {
-          const removed = await mergeDuplicates();
-          if (removed) Alert.alert('Done', `Removed ${removed} duplicate${removed > 1 ? 's' : ''}.`);
+    Alert.alert(
+      t('shopping.mergeDuplicatesTitle'),
+      t('shopping.mergeDuplicatesMsg', { count: duplicateCount }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('shopping.merge'),
+          style: 'destructive',
+          onPress: async () => {
+            const removed = await mergeDuplicates();
+            if (removed) Alert.alert(t('shopping.doneTitle'), t('shopping.removedDuplicatesMsg', { count: removed }));
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const unchecked = list?.listItems.filter(i => !i.checked) ?? [];
@@ -191,12 +201,12 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
   const hasLabels = labels.length > 0;
 
   const explainPossibleMatch = () => Alert.alert(
-    'Possibly the same item',
-    'This looks like it might be the same food as another item on your list, just worded differently. Check for a similar item nearby, and combine them yourself if so.',
+    t('shopping.possibleMatchTitle'),
+    t('shopping.possibleMatchMsg'),
   );
 
   const renderItem = (item: ShoppingListItem) => {
-    const label = item.display ?? item.note ?? item.food?.name ?? 'Item';
+    const label = item.display ?? item.note ?? item.food?.name ?? t('shopping.itemFallback');
     const flagged = possibleMatchIds.has(item.id);
     return (
       <TouchableOpacity
@@ -229,7 +239,7 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.title} numberOfLines={1}>{listName}</Text>
-          {total > 0 && <Text style={styles.progress}>{done}/{total} done</Text>}
+          {total > 0 && <Text style={styles.progress}>{t('shopping.progress', { done, total })}</Text>}
         </View>
         <View style={{ width: 32 }} />
       </View>
@@ -243,15 +253,15 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
         >
           {generating
             ? <ActivityIndicator color={colors.textInverse} size="small" />
-            : <Text style={styles.actionBtnText}>🗓 From Meal Plan</Text>
+            : <Text style={styles.actionBtnText}>{t('shopping.fromMealPlan')}</Text>
           }
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn} onPress={openAddRecipes}>
-          <Text style={styles.actionBtnText}>🍽 From Recipes</Text>
+          <Text style={styles.actionBtnText}>{t('shopping.fromRecipes')}</Text>
         </TouchableOpacity>
         {duplicateCount > 0 && (
           <TouchableOpacity style={styles.mergeBtn} onPress={handleMergeDuplicates}>
-            <Text style={styles.mergeBtnText}>Merge {duplicateCount} dupes</Text>
+            <Text style={styles.mergeBtnText}>{t('shopping.mergeDupesBtn', { count: duplicateCount })}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -263,10 +273,10 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
       ) : error ? (
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={refresh}><Text style={styles.retryText}>Retry</Text></TouchableOpacity>
+          <TouchableOpacity onPress={refresh}><Text style={styles.retryText}>{t('common.retry')}</Text></TouchableOpacity>
         </View>
       ) : total === 0 ? (
-        <EmptyState icon="🛒" title="List is empty" subtitle="Add items below" />
+        <EmptyState icon="🛒" title={t('shopping.listEmptyTitle')} subtitle={t('shopping.listEmptySubtitle')} />
       ) : (
         <ScrollView contentContainerStyle={styles.list} style={{ flex: 1 }}>
           {hasLabels ? (
@@ -293,7 +303,7 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
 
           {checked.length > 0 && (
             <>
-              <Text style={styles.divider}>Checked ({checked.length})</Text>
+              <Text style={styles.divider}>{t('shopping.checkedCount', { count: checked.length })}</Text>
               {checked.map(item => (
                 <View key={item.id}>{renderItem(item)}</View>
               ))}
@@ -306,7 +316,7 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
       <View style={styles.addBar}>
         <TextInput
           style={styles.addQtyInput}
-          placeholder="Qty"
+          placeholder={t('shopping.qtyPlaceholder')}
           placeholderTextColor={colors.textDisabled}
           value={newQty}
           onChangeText={setNewQty}
@@ -315,7 +325,7 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
         />
         <TextInput
           style={styles.addInput}
-          placeholder="Add item…"
+          placeholder={t('shopping.addItemPlaceholder')}
           placeholderTextColor={colors.textDisabled}
           value={newItem}
           onChangeText={setNewItem}
@@ -329,7 +339,7 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
         >
           {adding
             ? <ActivityIndicator color={colors.textInverse} size="small" />
-            : <Text style={styles.addSubmitText}>Add</Text>
+            : <Text style={styles.addSubmitText}>{t('shopping.addButton')}</Text>
           }
         </TouchableOpacity>
       </View>
@@ -343,9 +353,9 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
         <View style={addRecipesStyles.container}>
           <View style={addRecipesStyles.header}>
             <TouchableOpacity onPress={() => setShowAddRecipes(false)}>
-              <Text style={addRecipesStyles.cancel}>Cancel</Text>
+              <Text style={addRecipesStyles.cancel}>{t('common.cancel')}</Text>
             </TouchableOpacity>
-            <Text style={addRecipesStyles.title}>Add from Recipes</Text>
+            <Text style={addRecipesStyles.title}>{t('shopping.addFromRecipesTitle')}</Text>
             <View style={{ width: 60 }} />
           </View>
 
@@ -355,7 +365,7 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
               style={addRecipesStyles.searchInput}
               value={recipeSearch}
               onChangeText={handleRecipeSearch}
-              placeholder="Search recipes to add…"
+              placeholder={t('shopping.searchRecipesPlaceholder')}
               placeholderTextColor={colors.textDisabled}
               autoFocus
             />
@@ -370,7 +380,7 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
               contentContainerStyle={addRecipesStyles.resultsList}
               ListEmptyComponent={
                 <Text style={addRecipesStyles.emptyText}>
-                  {recipeSearch.trim() ? 'No recipes found' : 'Search for recipes to add their ingredients'}
+                  {recipeSearch.trim() ? t('shopping.noRecipesFound') : t('shopping.searchToAddIngredients')}
                 </Text>
               }
               renderItem={({ item }) => {
@@ -398,7 +408,9 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
             {addingRecipes
               ? <ActivityIndicator color={colors.textInverse} size="small" />
               : <Text style={addRecipesStyles.confirmBtnText}>
-                  Add {selectedRecipeIds.size > 0 ? `${selectedRecipeIds.size} ` : ''}Recipe{selectedRecipeIds.size === 1 ? '' : 's'}
+                  {selectedRecipeIds.size > 0
+                    ? t('shopping.addRecipesButtonWithCount', { count: selectedRecipeIds.size })
+                    : t('shopping.addRecipesButton')}
                 </Text>
             }
           </TouchableOpacity>

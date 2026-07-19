@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useCookbooks } from '../hooks/useCookbooks';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export default function CookbooksScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const { cookbooks, loading, error, refresh, createCookbook, updateCookbook, deleteCookbook } = useCookbooks();
 
   const [showEditor, setShowEditor] = useState(false);
@@ -45,21 +47,21 @@ export default function CookbooksScreen({ navigation }: Props) {
 
   const handleLongPress = (cookbook: Cookbook) => {
     Alert.alert(cookbook.name, undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Edit', onPress: () => openEdit(cookbook) },
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('cookbooks.edit'), onPress: () => openEdit(cookbook) },
       {
-        text: 'Delete',
+        text: t('cookbooks.delete'),
         style: 'destructive',
-        onPress: () => Alert.alert('Delete cookbook', `Delete "${cookbook.name}"?`, [
-          { text: 'Cancel', style: 'cancel' },
+        onPress: () => Alert.alert(t('cookbooks.deleteCookbookTitle'), t('cookbooks.deleteCookbookMsg', { name: cookbook.name }), [
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Delete',
+            text: t('cookbooks.delete'),
             style: 'destructive',
             onPress: async () => {
               try {
                 await deleteCookbook(cookbook.id);
               } catch (e) {
-                Alert.alert('Error', e instanceof Error ? e.message : 'Could not delete cookbook');
+                Alert.alert(t('common.error'), e instanceof Error ? e.message : t('cookbooks.genericDeleteError'));
               }
             },
           },
@@ -86,7 +88,7 @@ export default function CookbooksScreen({ navigation }: Props) {
       }
       setShowEditor(false);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not save cookbook');
+      Alert.alert(t('common.error'), e instanceof Error ? e.message : t('cookbooks.genericSaveError'));
     } finally {
       setSaving(false);
     }
@@ -95,7 +97,7 @@ export default function CookbooksScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Cookbooks</Text>
+        <Text style={styles.title}>{t('cookbooks.title')}</Text>
         <TouchableOpacity style={styles.addButton} onPress={openCreate}>
           <Text style={styles.addButtonText}>+</Text>
         </TouchableOpacity>
@@ -108,10 +110,10 @@ export default function CookbooksScreen({ navigation }: Props) {
       ) : error ? (
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={refresh}><Text style={styles.retryText}>Retry</Text></TouchableOpacity>
+          <TouchableOpacity onPress={refresh}><Text style={styles.retryText}>{t('common.retry')}</Text></TouchableOpacity>
         </View>
       ) : cookbooks.length === 0 ? (
-        <EmptyState icon="📖" title="No cookbooks yet" subtitle="Tap + to create your first cookbook" />
+        <EmptyState icon="📖" title={t('cookbooks.emptyTitle')} subtitle={t('cookbooks.emptySubtitle')} />
       ) : (
         <FlatList
           data={cookbooks}
@@ -141,10 +143,10 @@ export default function CookbooksScreen({ navigation }: Props) {
       <Modal visible={showEditor} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{editing ? 'Edit Cookbook' : 'New Cookbook'}</Text>
+            <Text style={styles.modalTitle}>{editing ? t('cookbooks.editTitle') : t('cookbooks.newTitle')}</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="Cookbook name"
+              placeholder={t('cookbooks.namePlaceholder')}
               placeholderTextColor={colors.textDisabled}
               value={name}
               onChangeText={setName}
@@ -152,7 +154,7 @@ export default function CookbooksScreen({ navigation }: Props) {
             />
             <TextInput
               style={[styles.modalInput, styles.modalTextarea]}
-              placeholder="Description (optional)"
+              placeholder={t('cookbooks.descriptionPlaceholder')}
               placeholderTextColor={colors.textDisabled}
               value={description}
               onChangeText={setDescription}
@@ -164,11 +166,11 @@ export default function CookbooksScreen({ navigation }: Props) {
               <View style={[styles.checkbox, isPublic && styles.checkboxChecked]}>
                 {isPublic ? <Text style={styles.checkboxMark}>✓</Text> : null}
               </View>
-              <Text style={styles.publicLabel}>Public (visible without an account)</Text>
+              <Text style={styles.publicLabel}>{t('cookbooks.publicLabel')}</Text>
             </TouchableOpacity>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setShowEditor(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalConfirm, (saving || !name.trim()) && styles.buttonDisabled]}
@@ -177,7 +179,7 @@ export default function CookbooksScreen({ navigation }: Props) {
               >
                 {saving
                   ? <ActivityIndicator color={colors.textInverse} size="small" />
-                  : <Text style={styles.modalConfirmText}>{editing ? 'Save' : 'Create'}</Text>
+                  : <Text style={styles.modalConfirmText}>{editing ? t('cookbooks.save') : t('cookbooks.create')}</Text>
                 }
               </TouchableOpacity>
             </View>
