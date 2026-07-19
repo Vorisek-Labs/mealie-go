@@ -27,7 +27,18 @@
     "invalidUrlMsg": "A URL do servidor deve começar com http:// ou https://",
     "connectionFailedTitle": "Falha na conexão",
     "genericConnectError": "Não foi possível conectar ao servidor.",
-    "genericSignInError": "Não foi possível concluir o login."
+    "genericSignInError": "Não foi possível concluir o login.",
+    "apiTokenToggle": "Entrar com um token de API?",
+    "apiTokenHint": "Para servidores somente com SSO: na interface web do Mealie, abra seu perfil de usuário → Tokens de API, crie um token e cole-o aqui.",
+    "apiTokenPlaceholder": "cole seu token de API",
+    "apiTokenButton": "Entrar com token"
+  },
+  "oidc": {
+    "title": "Entrar com {{provider}}",
+    "cancel": "Cancelar",
+    "manualContinue": "Já entrei — Continuar",
+    "notSignedInTitle": "Ainda não conectado",
+    "notSignedInMsg": "Conclua o login acima e toque novamente em \"Já entrei\"."
   },
   "settings": {
     "title": "Configurações",

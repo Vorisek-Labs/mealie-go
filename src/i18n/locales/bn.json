@@ -27,7 +27,18 @@
     "invalidUrlMsg": "সার্ভার URL অবশ্যই http:// অথবা https:// দিয়ে শুরু হতে হবে",
     "connectionFailedTitle": "সংযোগ ব্যর্থ হয়েছে",
     "genericConnectError": "সার্ভারের সাথে সংযোগ করা যায়নি।",
-    "genericSignInError": "সাইন-ইন সম্পন্ন করা যায়নি।"
+    "genericSignInError": "সাইন-ইন সম্পন্ন করা যায়নি।",
+    "apiTokenToggle": "পরিবর্তে API টোকেন দিয়ে সাইন ইন করবেন?",
+    "apiTokenHint": "শুধু-SSO সার্ভারের জন্য: Mealie-এর ওয়েব ইন্টারফেসে আপনার ব্যবহারকারী প্রোফাইল → API টোকেন খুলুন, একটি টোকেন তৈরি করুন এবং এখানে পেস্ট করুন।",
+    "apiTokenPlaceholder": "আপনার API টোকেন পেস্ট করুন",
+    "apiTokenButton": "টোকেন দিয়ে সাইন ইন"
+  },
+  "oidc": {
+    "title": "{{provider}} দিয়ে লগ ইন করুন",
+    "cancel": "বাতিল",
+    "manualContinue": "আমি সাইন ইন করেছি — চালিয়ে যান",
+    "notSignedInTitle": "এখনও সাইন ইন হয়নি",
+    "notSignedInMsg": "উপরে সাইন ইন সম্পূর্ণ করুন, তারপর আবার \"আমি সাইন ইন করেছি\" চাপুন।"
   },
   "settings": {
     "title": "সেটিংস",

@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
-import { OIDC_LOGIN_PATH, OIDC_TOKEN_COOKIE_NAME } from '../lib/mealieApi';
+import { useTranslation } from 'react-i18next';
+import { OIDC_LOGIN_PATH } from '../lib/mealieApi';
 import type { ProxyHeader } from '../lib/mealieApi';
 import { colors, radius, spacing, typography } from '../theme';
 
@@ -13,68 +14,92 @@ interface Props {
   onCancel: () => void;
 }
 
-// Reads the token cookie if present and posts it back; posts a
-// 'not-found' message otherwise so the caller can tell "nothing there yet"
-// apart from "never heard back at all". Some Nuxt useCookie configurations
-// JSON-serialize a string value (wrapping it in literal quote characters)
-// rather than storing it raw -- stripping any such wrapping quotes here is
-// cheap insurance against a malformed Bearer token later.
-function checkScript(reportKind: 'poll' | 'manual'): string {
+// Detection strategy (v1.4.0, replacing the earlier document.cookie read
+// that failed in the field): instead of trying to READ the auth cookie --
+// which breaks whenever it's httpOnly, renamed, partitioned, or stored
+// differently across Mealie versions (the backend stopped setting its own
+// cookie in Nov 2025's #6601, so cookie mechanics genuinely differ between
+// versions users run) -- ask the server. Mealie's get_current_user accepts
+// the auth cookie in lieu of an Authorization header on every version
+// checked (v2-era and current), so an in-page fetch of /api/auth/refresh
+// with credentials attached succeeds exactly when the WebView holds a
+// valid session, whatever form that session's cookie takes, and the JSON
+// response hands us a fresh access_token that injected JS can always read.
+//
+// Both scripts are origin-guarded: they no-op on the identity provider's
+// own pages mid-redirect, and only probe once the WebView is back on the
+// Mealie origin.
+function buildProbe(serverUrl: string, expectedOrigin: string, kind: 'poll' | 'manual'): string {
   return `
 (function() {
-  var match = document.cookie.match(/(?:^|; )${OIDC_TOKEN_COOKIE_NAME.replace('.', '\\\\.')}=([^;]*)/);
-  if (match) {
-    var value = decodeURIComponent(match[1]);
-    if (value.length >= 2 && value[0] === '"' && value[value.length - 1] === '"') {
-      value = value.slice(1, -1);
+  var notFound = function() {
+    if ('${kind}' === 'manual') {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'not-found' }));
     }
-    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'token', token: value, via: '${reportKind}' }));
-  } else if ('${reportKind}' === 'manual') {
-    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'not-found' }));
-  }
+  };
+  if (window.location.origin !== ${JSON.stringify(expectedOrigin)}) { notFound(); return; }
+  fetch(${JSON.stringify(serverUrl)} + '/api/auth/refresh', {
+    credentials: 'include',
+    headers: { 'Accept': 'application/json' }
+  })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (data && data.access_token) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'token', token: data.access_token, via: '${kind}' }));
+      } else {
+        notFound();
+      }
+    })
+    .catch(notFound);
 })();
 true;
 `;
 }
 
-// Mealie's own SPA handles the entire OIDC exchange itself once the
-// provider redirects back to {serverUrl}/login (see the comment above
-// OIDC_LOGIN_PATH in mealieApi.ts) -- this just watches for the resulting
-// cookie to appear, rather than reimplementing the exchange. Runs as a
-// self-clearing interval (not a one-shot check) since the cookie only
-// appears after an async XHR the SPA fires post-load, not at load time
-// itself. Re-injected fresh on every page load by react-native-webview,
-// which naturally covers the whole multi-domain redirect chain (provider's
-// login page, then back to Mealie's own domain). Not fully reliable in
-// practice (see the manual fallback button below) -- a real user's report
-// (2026-07-18, Authentik) showed the SPA's own login completing while this
-// polling never fired, root cause not yet confirmed.
-const POLL_SCRIPT = `
+function buildPollScript(serverUrl: string, expectedOrigin: string): string {
+  return `
 (function() {
-  if (window.__mealieOidcPolling) return;
-  window.__mealieOidcPolling = true;
+  if (window.__mealieOidcProbe) return;
+  if (window.location.origin !== ${JSON.stringify(expectedOrigin)}) return;
+  window.__mealieOidcProbe = true;
   var attempts = 0;
   var interval = setInterval(function() {
     attempts++;
-    if (attempts > 120) { clearInterval(interval); return; }
-    var match = document.cookie.match(/(?:^|; )${OIDC_TOKEN_COOKIE_NAME.replace('.', '\\\\.')}=([^;]*)/);
-    if (match) {
-      clearInterval(interval);
-      var value = decodeURIComponent(match[1]);
-      if (value.length >= 2 && value[0] === '"' && value[value.length - 1] === '"') {
-        value = value.slice(1, -1);
-      }
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'token', token: value, via: 'poll' }));
-    }
-  }, 500);
+    if (attempts > 90) { clearInterval(interval); return; }
+    fetch(${JSON.stringify(serverUrl)} + '/api/auth/refresh', {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (data && data.access_token) {
+          clearInterval(interval);
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'token', token: data.access_token, via: 'poll' }));
+        }
+      })
+      .catch(function() {});
+  }, 2000);
 })();
 true;
 `;
+}
 
 export default function OidcLoginModal({ serverUrl, proxyHeaders, providerName, onSuccess, onCancel }: Props) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const doneRef = useRef(false);
   const webViewRef = useRef<WebView>(null);
+
+  // serverUrl may include a subpath (Mealie's SUB_PATH installs), so the
+  // fetch above uses the full serverUrl as its base while the origin guard
+  // compares only scheme+host+port, which is all location.origin carries.
+  const expectedOrigin = useMemo(() => {
+    try {
+      return new URL(serverUrl).origin;
+    } catch {
+      return serverUrl;
+    }
+  }, [serverUrl]);
 
   const headersRecord: Record<string, string> = {};
   proxyHeaders.forEach(h => { if (h.name.trim()) headersRecord[h.name.trim()] = h.value; });
@@ -87,10 +112,7 @@ export default function OidcLoginModal({ serverUrl, proxyHeaders, providerName, 
         doneRef.current = true;
         onSuccess(data.token);
       } else if (data?.type === 'not-found') {
-        Alert.alert(
-          'Not signed in yet',
-          'Finish signing in above, then tap "I\'ve signed in" again.'
-        );
+        Alert.alert(t('oidc.notSignedInTitle'), t('oidc.notSignedInMsg'));
       }
     } catch {
       // Ignore malformed messages -- nothing else posts to this bridge.
@@ -109,15 +131,15 @@ export default function OidcLoginModal({ serverUrl, proxyHeaders, providerName, 
     }
   };
 
-  // Redundant with POLL_SCRIPT's own interval -- cheap insurance in case
-  // that interval never got set up on a given page load for any reason
-  // (e.g. a full-page reload racing the injection). Runs on every load.
+  // Redundant with the poll script's own interval -- cheap insurance in
+  // case that interval never got installed on a given page load for any
+  // reason (e.g. a full-page reload racing the injection). Runs per load.
   const handleLoadEnd = () => {
-    if (!doneRef.current) webViewRef.current?.injectJavaScript(checkScript('poll'));
+    if (!doneRef.current) webViewRef.current?.injectJavaScript(buildProbe(serverUrl, expectedOrigin, 'poll'));
   };
 
   const handleManualCheck = () => {
-    webViewRef.current?.injectJavaScript(checkScript('manual'));
+    webViewRef.current?.injectJavaScript(buildProbe(serverUrl, expectedOrigin, 'manual'));
   };
 
   return (
@@ -125,9 +147,9 @@ export default function OidcLoginModal({ serverUrl, proxyHeaders, providerName, 
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={styles.cancel}>Cancel</Text>
+            <Text style={styles.cancel}>{t('oidc.cancel')}</Text>
           </TouchableOpacity>
-          <Text style={styles.title} numberOfLines={1}>Log in with {providerName}</Text>
+          <Text style={styles.title} numberOfLines={1}>{t('oidc.title', { provider: providerName })}</Text>
           <View style={{ width: 60 }} />
         </View>
         <View style={styles.webviewWrapper}>
@@ -138,7 +160,7 @@ export default function OidcLoginModal({ serverUrl, proxyHeaders, providerName, 
             onMessage={handleMessage}
             onNavigationStateChange={handleNavStateChange}
             onLoadEnd={handleLoadEnd}
-            injectedJavaScript={POLL_SCRIPT}
+            injectedJavaScript={buildPollScript(serverUrl, expectedOrigin)}
             sharedCookiesEnabled
             startInLoadingState
           />
@@ -148,12 +170,11 @@ export default function OidcLoginModal({ serverUrl, proxyHeaders, providerName, 
             </View>
           )}
         </View>
-        {/* Manual fallback -- if the automatic detection above misses the
-            cookie for any reason, this lets the user force a check instead
-            of being stuck once they've actually finished signing in. Always
-            visible/tappable, independent of the loading overlay above. */}
+        {/* Manual fallback -- if the automatic detection above misses for
+            any reason, this forces an immediate server-side session check
+            instead of leaving the user stuck after they've signed in. */}
         <TouchableOpacity style={styles.manualCheckButton} onPress={handleManualCheck}>
-          <Text style={styles.manualCheckText}>I've signed in — Continue</Text>
+          <Text style={styles.manualCheckText}>{t('oidc.manualContinue')}</Text>
         </TouchableOpacity>
       </View>
     </Modal>

@@ -27,7 +27,18 @@
     "invalidUrlMsg": "Server URL must start with http:// or https://",
     "connectionFailedTitle": "Connection failed",
     "genericConnectError": "Could not connect to server.",
-    "genericSignInError": "Could not complete sign-in."
+    "genericSignInError": "Could not complete sign-in.",
+    "apiTokenToggle": "Sign in with an API token instead?",
+    "apiTokenHint": "For SSO-only servers: in Mealie's web interface, open your user profile → API Tokens, create a token, and paste it here.",
+    "apiTokenPlaceholder": "paste your API token",
+    "apiTokenButton": "Sign In with Token"
+  },
+  "oidc": {
+    "title": "Log in with {{provider}}",
+    "cancel": "Cancel",
+    "manualContinue": "I've signed in — Continue",
+    "notSignedInTitle": "Not signed in yet",
+    "notSignedInMsg": "Finish signing in above, then tap \"I've signed in — Continue\" again."
   },
   "settings": {
     "title": "Settings",

@@ -27,7 +27,18 @@
     "invalidUrlMsg": "L'URL du serveur doit commencer par http:// ou https://",
     "connectionFailedTitle": "Échec de la connexion",
     "genericConnectError": "Impossible de se connecter au serveur.",
-    "genericSignInError": "Impossible de terminer la connexion."
+    "genericSignInError": "Impossible de terminer la connexion.",
+    "apiTokenToggle": "Se connecter avec un jeton d'API ?",
+    "apiTokenHint": "Pour les serveurs SSO uniquement : dans l'interface web de Mealie, ouvrez votre profil utilisateur → Jetons d'API, créez un jeton et collez-le ici.",
+    "apiTokenPlaceholder": "collez votre jeton d'API",
+    "apiTokenButton": "Se connecter avec le jeton"
+  },
+  "oidc": {
+    "title": "Se connecter avec {{provider}}",
+    "cancel": "Annuler",
+    "manualContinue": "Je me suis connecté — Continuer",
+    "notSignedInTitle": "Pas encore connecté",
+    "notSignedInMsg": "Terminez la connexion ci-dessus, puis appuyez à nouveau sur « Je me suis connecté »."
   },
   "settings": {
     "title": "Paramètres",

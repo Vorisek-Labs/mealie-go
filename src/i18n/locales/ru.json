@@ -27,7 +27,18 @@
     "invalidUrlMsg": "URL сервера должен начинаться с http:// или https://",
     "connectionFailedTitle": "Ошибка подключения",
     "genericConnectError": "Не удалось подключиться к серверу.",
-    "genericSignInError": "Не удалось завершить вход."
+    "genericSignInError": "Не удалось завершить вход.",
+    "apiTokenToggle": "Войти с помощью API-токена?",
+    "apiTokenHint": "Для серверов только с SSO: в веб-интерфейсе Mealie откройте профиль пользователя → API-токены, создайте токен и вставьте его сюда.",
+    "apiTokenPlaceholder": "вставьте ваш API-токен",
+    "apiTokenButton": "Войти с токеном"
+  },
+  "oidc": {
+    "title": "Войти через {{provider}}",
+    "cancel": "Отмена",
+    "manualContinue": "Я вошёл — продолжить",
+    "notSignedInTitle": "Вход ещё не выполнен",
+    "notSignedInMsg": "Завершите вход выше, затем снова нажмите «Я вошёл»."
   },
   "settings": {
     "title": "Настройки",

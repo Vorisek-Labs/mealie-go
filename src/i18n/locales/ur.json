@@ -27,7 +27,18 @@
     "invalidUrlMsg": "سرور URL کا آغاز http:// یا https:// سے ہونا چاہیے",
     "connectionFailedTitle": "رابطہ ناکام",
     "genericConnectError": "سرور سے رابطہ نہیں ہو سکا۔",
-    "genericSignInError": "سائن اِن مکمل نہیں ہو سکا۔"
+    "genericSignInError": "سائن اِن مکمل نہیں ہو سکا۔",
+    "apiTokenToggle": "اس کے بجائے API ٹوکن سے سائن اِن کریں؟",
+    "apiTokenHint": "صرف-SSO سرورز کے لیے: Mealie کے ویب انٹرفیس میں اپنی صارف پروفائل → API ٹوکنز کھولیں، ایک ٹوکن بنائیں اور یہاں چسپاں کریں۔",
+    "apiTokenPlaceholder": "اپنا API ٹوکن چسپاں کریں",
+    "apiTokenButton": "ٹوکن سے سائن اِن کریں"
+  },
+  "oidc": {
+    "title": "{{provider}} کے ذریعے لاگ اِن کریں",
+    "cancel": "منسوخ کریں",
+    "manualContinue": "میں نے سائن اِن کر لیا — جاری رکھیں",
+    "notSignedInTitle": "ابھی سائن اِن نہیں ہوا",
+    "notSignedInMsg": "پہلے اوپر سائن اِن مکمل کریں، پھر دوبارہ \"میں نے سائن اِن کر لیا\" پر ٹیپ کریں۔"
   },
   "settings": {
     "title": "ترتیبات",

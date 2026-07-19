@@ -13,13 +13,15 @@ import bn from './locales/bn.json';
 import ru from './locales/ru.json';
 import pt from './locales/pt.json';
 import ur from './locales/ur.json';
+import de from './locales/de.json';
 
 const LANGUAGE_KEY = 'mealie_go.language';
 
-// The 10 most-spoken languages worldwide (by total speakers) -- this is a
-// pilot covering ConnectScreen + SettingsScreen only; the rest of the app's
-// ~15 screens still need their strings extracted. AI-translated, not yet
-// reviewed by native speakers -- treat as a starting point, not final copy.
+// The 10 most-spoken languages worldwide (by total speakers), plus German
+// (added 2026-07-18 by direct user request) -- this is a pilot covering
+// ConnectScreen + SettingsScreen + OidcLoginModal only; the rest of the
+// app's ~15 screens still need their strings extracted. AI-translated, not
+// yet reviewed by native speakers -- a starting point, not final copy.
 export const SUPPORTED_LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'zh', label: '中文' },
@@ -31,6 +33,7 @@ export const SUPPORTED_LANGUAGES = [
   { code: 'ru', label: 'Русский' },
   { code: 'pt', label: 'Português' },
   { code: 'ur', label: 'اردو' },
+  { code: 'de', label: 'Deutsch' },
 ] as const;
 
 export type LanguageCode = typeof SUPPORTED_LANGUAGES[number]['code'];
@@ -52,6 +55,7 @@ const resources = {
   ru: { translation: ru },
   pt: { translation: pt },
   ur: { translation: ur },
+  de: { translation: de },
 };
 
 function isSupported(code: string): code is LanguageCode {

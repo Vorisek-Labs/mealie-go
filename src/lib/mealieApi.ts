@@ -343,18 +343,15 @@ export function isOldMealieVersion(version: string | undefined): boolean {
 
 // Mealie's own OIDC flow is designed only for its first-party web app: the
 // provider's redirect_uri is fixed to Mealie's own {serverUrl}/login (see
-// Mealie's OIDC docs -- custom schemes aren't supported), where its SPA's
-// own JS detects the ?code=&state= callback, exchanges it via
-// /api/auth/oauth/callback, and stores the result in a plain (non-httpOnly)
-// "mealie.access_token" cookie (confirmed against Mealie's frontend source:
-// nuxt.config.ts's AUTH_TOKEN constant and use-token-cookie.ts, which uses
-// Nuxt's client-side useCookie -- httpOnly cookies can only ever be set by
-// a Set-Cookie response header, never by client JS, so this one can't be).
-// So rather than reimplementing the code exchange ourselves, this lets the
-// real flow run untouched inside a WebView and just reads that cookie
-// after it completes -- see OidcLoginModal.tsx.
+// Mealie's OIDC docs -- custom schemes aren't supported), where its SPA
+// detects the ?code=&state= callback and completes the exchange itself.
+// Rather than reimplementing that exchange, the app lets the real flow run
+// untouched inside a WebView, then confirms the resulting session
+// server-side -- see OidcLoginModal.tsx for the detection strategy and why
+// it deliberately never reads the session cookie directly (cookie
+// mechanics differ across Mealie versions; the earlier cookie-reading
+// approach failed in the field).
 export const OIDC_LOGIN_PATH = '/api/auth/oauth';
-export const OIDC_TOKEN_COOKIE_NAME = 'mealie.access_token';
 
 // Media endpoints take the recipe UUID (recipe.id), NOT the slug —
 // passing a slug returns a 422 UUID-parse error from the server.

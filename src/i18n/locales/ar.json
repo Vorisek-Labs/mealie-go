@@ -27,7 +27,18 @@
     "invalidUrlMsg": "يجب أن يبدأ رابط الخادم بـ http:// أو https://",
     "connectionFailedTitle": "فشل الاتصال",
     "genericConnectError": "تعذر الاتصال بالخادم.",
-    "genericSignInError": "تعذر إكمال تسجيل الدخول."
+    "genericSignInError": "تعذر إكمال تسجيل الدخول.",
+    "apiTokenToggle": "تسجيل الدخول برمز API بدلاً من ذلك؟",
+    "apiTokenHint": "للخوادم التي تعتمد SSO فقط: في واجهة Mealie على الويب، افتح ملفك الشخصي ← رموز API، وأنشئ رمزًا والصقه هنا.",
+    "apiTokenPlaceholder": "الصق رمز API الخاص بك",
+    "apiTokenButton": "تسجيل الدخول بالرمز"
+  },
+  "oidc": {
+    "title": "تسجيل الدخول عبر {{provider}}",
+    "cancel": "إلغاء",
+    "manualContinue": "لقد سجّلت الدخول — متابعة",
+    "notSignedInTitle": "لم يتم تسجيل الدخول بعد",
+    "notSignedInMsg": "أكمل تسجيل الدخول أعلاه، ثم اضغط مرة أخرى على «لقد سجّلت الدخول»."
   },
   "settings": {
     "title": "الإعدادات",

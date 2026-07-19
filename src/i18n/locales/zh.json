@@ -27,7 +27,18 @@
     "invalidUrlMsg": "服务器地址必须以 http:// 或 https:// 开头",
     "connectionFailedTitle": "连接失败",
     "genericConnectError": "无法连接到服务器。",
-    "genericSignInError": "无法完成登录。"
+    "genericSignInError": "无法完成登录。",
+    "apiTokenToggle": "改用 API 令牌登录？",
+    "apiTokenHint": "适用于仅支持 SSO 的服务器：在 Mealie 网页界面中打开用户资料 → API 令牌，创建一个令牌并粘贴到此处。",
+    "apiTokenPlaceholder": "粘贴您的 API 令牌",
+    "apiTokenButton": "使用令牌登录"
+  },
+  "oidc": {
+    "title": "使用 {{provider}} 登录",
+    "cancel": "取消",
+    "manualContinue": "我已登录 — 继续",
+    "notSignedInTitle": "尚未登录",
+    "notSignedInMsg": "请先在上方完成登录，然后再次点按“我已登录”。"
   },
   "settings": {
     "title": "设置",

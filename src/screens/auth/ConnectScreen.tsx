@@ -33,6 +33,8 @@ export default function ConnectScreen() {
   // than hiding them on a network hiccup or an older server without this route.
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const [showOidcModal, setShowOidcModal] = useState(false);
+  const [showApiTokenSection, setShowApiTokenSection] = useState(false);
+  const [apiToken, setApiToken] = useState('');
   const usernameRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
@@ -152,9 +154,11 @@ export default function ConnectScreen() {
   };
 
   // Mirrors the tail of handleConnect -- no password/remember-account step
-  // since there's no password with SSO, but proxy headers and the server
-  // URL still need to be persisted the same way.
-  const handleOidcSuccess = async (token: string) => {
+  // since there's no password here, but proxy headers and the server URL
+  // still need to be persisted the same way. Shared by the OIDC WebView
+  // flow and the pasted-API-token flow: both end the same way, with a
+  // bearer token that api.getSelf() validates.
+  const completeTokenSignIn = async (token: string) => {
     setShowOidcModal(false);
     const url = serverUrl.trim().replace(/\/$/, '');
     const activeProxyHeaders = proxyHeaders.filter(h => h.name.trim());
@@ -174,6 +178,17 @@ export default function ConnectScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApiTokenSignIn = () => {
+    const url = serverUrl.trim().replace(/\/$/, '');
+    const tok = apiToken.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      Alert.alert(t('connect.invalidUrlTitle'), t('connect.invalidUrlMsg'));
+      return;
+    }
+    if (!tok) return;
+    completeTokenSignIn(tok);
   };
 
   const uniqueServers = [...new Set(savedAccounts.map(a => a.serverUrl))];
@@ -380,6 +395,39 @@ export default function ConnectScreen() {
             </View>
           )}
 
+          <TouchableOpacity
+            style={styles.proxyToggleRow}
+            onPress={() => setShowApiTokenSection(s => !s)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.proxyToggleText}>
+              {showApiTokenSection ? '▾' : '▸'} {t('connect.apiTokenToggle')}
+            </Text>
+          </TouchableOpacity>
+
+          {showApiTokenSection && (
+            <View style={styles.proxySection}>
+              <Text style={styles.proxyHint}>{t('connect.apiTokenHint')}</Text>
+              <TextInput
+                style={styles.inputFull}
+                placeholder={t('connect.apiTokenPlaceholder')}
+                placeholderTextColor={colors.textDisabled}
+                value={apiToken}
+                onChangeText={setApiToken}
+                autoCapitalize="none"
+                autoCorrect={false}
+                multiline
+              />
+              <TouchableOpacity
+                style={[styles.oidcButton, loading && styles.buttonDisabled]}
+                onPress={handleApiTokenSignIn}
+                disabled={loading || !apiToken.trim()}
+              >
+                <Text style={styles.oidcButtonText}>{t('connect.apiTokenButton')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {appInfo?.allowPasswordLogin !== false && (
             <>
               <TouchableOpacity
@@ -424,7 +472,7 @@ export default function ConnectScreen() {
           serverUrl={serverUrl.trim().replace(/\/$/, '')}
           proxyHeaders={proxyHeaders.filter(h => h.name.trim())}
           providerName={appInfo?.oidcProviderName || 'SSO'}
-          onSuccess={handleOidcSuccess}
+          onSuccess={completeTokenSignIn}
           onCancel={() => setShowOidcModal(false)}
         />
       )}
