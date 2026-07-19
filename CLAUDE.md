@@ -402,13 +402,15 @@ in the alert (deliberately untranslated — it's meant to be relayed back in a b
 localized UI copy). If SSO is reported broken again, ask for this exact string before guessing
 further — it should make the next diagnosis a single round-trip instead of several.
 
-### Localization (i18n) — in progress, not a Mealie API
-Added 2026-07-18 after user feedback ("we need language support!"). This app's UI has ~15 screens
+### Localization (i18n) — full app coverage as of v1.6.0
+Added 2026-07-18 after user feedback ("we need language support!"). This app's UI had ~15 screens
 and 500+ hardcoded English strings — translating everything in one pass wasn't realistic, so this
-shipped as an infrastructure-plus-pilot: the underlying i18n setup is done and works, but only
-`ConnectScreen` and `SettingsScreen` have had their strings actually extracted. Every other screen
-still has raw English `<Text>` literals — **this is the expected state, not a bug**, until each
-remaining screen gets migrated the same way.
+shipped as an infrastructure-plus-pilot (`ConnectScreen` + `SettingsScreen` first) and was completed
+screen-by-screen over several sessions per Ken's "keep going" direction (2026-07-19). **As of
+v1.6.0 every screen and shared component in the app is translated into all 11 supported
+languages** — see the full namespace list below. If you add a NEW screen or string going forward,
+it needs a translation key + `t()` call the same way, in all 11 locale files — this is no longer a
+"some screens still need migrating" situation, it's "don't regress this."
 
 - `src/i18n/index.ts` — `initI18n()` (call once at startup, before anything using
   `useTranslation()` renders — `App.tsx` gates its first render on this), `setLanguage()`,
@@ -427,26 +429,18 @@ remaining screen gets migrated the same way.
   AI-translated, not yet reviewed by a native speaker of each language** — treat as a reasonable
   starting point, not verified-correct copy. If a user reports a translation is wrong or awkward,
   that's expected until someone fluent reviews it.
-- Translated surfaces so far: `ConnectScreen` (incl. proxy-header + API-token sections),
-  `SettingsScreen`, `OidcLoginModal` (the `"oidc"` namespace, added v1.4.0), `GuideScreen` +
-  `WelcomeScreen` (the `"guide"`/`"welcome"` namespaces, added v1.5.0 — flagged as missed by a
-  user, since these are the two onboarding/help screens and easy to overlook when only auth
-  screens had been done), and as of v1.5.1: `RecipeFilterModal`, `FoodOrUnitPicker`,
-  `CookModeModal`, `ActiveFilterChips`, and `lib/timeEstimate.ts`. As of v1.5.2: the Recipes-tab
-  flow — `RecipesScreen`, `AddRecipeScreen`, `RecipeSuggestionsScreen` (the `"recipes"`,
-  `"addRecipe"`, `"suggestions"` namespaces). As of v1.5.3: the Meal Plan, Shopping, and Cookbooks
-  tabs — `MealPlanScreen` (`"mealPlan"` namespace, including day-of-week abbreviations and the
-  add-entry modal's date header, which now formats via `i18n.language` instead of a hardcoded
-  `'en'` locale), `ShoppingListsScreen` + `ShoppingListDetailScreen` (`"shopping"` namespace,
-  covering the "From Recipes"/"From Meal Plan" flows and duplicate-merge pluralized strings),
-  `CookbooksScreen` + `CookbookDetailScreen` (`"cookbooks"` namespace; the detail screen reuses
-  `recipes.emptySearchTitle`/`emptySearchSubtitle`/`genericRandomError` for its search/filter/
-  random-recipe states instead of duplicating identical English copy). As of v1.5.4:
-  `IngredientParseReviewModal` (`"ingredientReview"` namespace) and `RecipeDetailScreen`
-  (`"recipeDetail"` namespace, ~1093 lines — the largest screen translated so far). Ken asked to
-  keep going toward full app coverage (2026-07-19) — this is an active, ongoing, screen-by-screen
-  effort, not finished; check git log / this section for the current frontier before assuming a
-  screen is done. Still untranslated: `RecipeEditScreen` (~875 lines) — the last remaining screen.
+- Translated surfaces (complete, v1.6.0): `ConnectScreen` (incl. proxy-header + API-token
+  sections), `SettingsScreen`, `OidcLoginModal` (`"oidc"`, v1.4.0), `GuideScreen` + `WelcomeScreen`
+  (`"guide"`/`"welcome"`, v1.5.0), `RecipeFilterModal`, `FoodOrUnitPicker`, `CookModeModal`,
+  `ActiveFilterChips`, `lib/timeEstimate.ts` (shared components, v1.5.1), the Recipes-tab flow —
+  `RecipesScreen`, `AddRecipeScreen`, `RecipeSuggestionsScreen` (`"recipes"`/`"addRecipe"`/
+  `"suggestions"`, v1.5.2), the Meal Plan/Shopping/Cookbooks tabs — `MealPlanScreen`
+  (`"mealPlan"`), `ShoppingListsScreen` + `ShoppingListDetailScreen` (`"shopping"`),
+  `CookbooksScreen` + `CookbookDetailScreen` (`"cookbooks"`, reuses `recipes.*` keys for
+  identical empty/random-recipe states — v1.5.3), `IngredientParseReviewModal`
+  (`"ingredientReview"`) + `RecipeDetailScreen` (`"recipeDetail"`, ~1093 lines, v1.5.4), and
+  finally `RecipeEditScreen` (`"recipeEdit"`, ~875 lines, v1.6.0 — reuses several `recipeDetail.*`
+  attachment keys since both screens show an identical attachments list).
   `GuideScreen`'s tip lists use `t(key, { returnObjects: true })` to get an array back instead of a
   string — needed any time a key's value is an array/object, not a plain string.
 - **PDF export content is translated too (v1.5.4)** — `RecipeDetailScreen.tsx`'s
@@ -693,6 +687,33 @@ At the end of every session, commit all changes AND update the Current Build Sta
 ## Current Build Status
 
 **Session (latest) — 2026-07-19**
+
+### Session 2026-07-19 (part 7) — translated the recipe edit screen — full app coverage complete, v1.6.0
+Final piece of the "keep going" translation effort that began with v1.3.1's infrastructure-plus-
+pilot. Every screen and shared component in the app is now translated into all 11 supported
+languages (English, German, Spanish, French, Chinese, Hindi, Arabic, Bengali, Russian, Portuguese,
+Urdu).
+- Migrated `RecipeEditScreen` (~875 lines) to `useTranslation()` — new `"recipeEdit"` namespace,
+  all 11 locales. Covers the top bar, photo picker, basic-info fields (name/description/yield/
+  prep/cook/total time), the ingredient editor (including section-title toggling and the "Parse
+  Ingredients" entry point), steps, tags, categories, notes, and attachments.
+- Reuses `recipeDetail.addAttachmentButton`/`cannotOpenTitle`/`cannotOpenMsg`/`openAction`/
+  `noAttachments` for its attachments list instead of duplicating identical copy already added in
+  v1.5.4 — same screen-to-screen reuse discipline as `CookbookDetailScreen`'s reuse of `recipes.*`.
+- Found and fixed **two more `t`-shadowing risks** (same recurring bug class caught in
+  `RecipeFilterModal`, `RecipeSuggestionsScreen`, and `RecipeDetailScreen`): a tag-selection
+  `.some(t => ...)`/`.filter(t => ...)` pair and the ingredient-lines `.filter(t => t.trim())`
+  passed to `IngredientParseReviewModal` — both renamed (`sel`, `text`) before they could shadow
+  `t()`.
+- `npx tsc --noEmit` clean across all 11 locale JSON files + the migrated screen.
+- Built + verified release APK signed with the upload key via `apksigner verify --print-certs`.
+- Bumped to **1.6.0** (not another 1.5.x patch) since this closes out the entire multi-session
+  full-app-translation effort — a meaningful milestone, not just another incremental batch.
+- NEEDS DEVICE TESTING: this batch's translated strings, and more broadly — **no screen's
+  translated strings in ANY of the 10 non-English languages have had a live on-device pass yet**
+  across this entire effort (v1.3.1 through v1.6.0). All 11 locale files are also still
+  AI-translated and unreviewed by native speakers. Both are the natural next steps now that
+  coverage itself is complete, not further string migration.
 
 ### Session 2026-07-19 (part 6) — translated ingredient-parse review and the recipe detail screen, v1.5.4
 Continuation of "keep going" toward full app-wide translation coverage — this is the largest single

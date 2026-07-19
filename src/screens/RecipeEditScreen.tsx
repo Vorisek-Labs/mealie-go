@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useRecipeMedia } from '../hooks/useRecipeMedia';
 import IngredientParseReviewModal, { formatIngredientPreview } from '../components/IngredientParseReviewModal';
@@ -50,6 +51,7 @@ function AddBtn({ label, onPress }: { label: string; onPress: () => void }) {
 }
 
 export default function RecipeEditScreen({ navigation, route }: Props) {
+  const { t } = useTranslation();
   const { slug } = route.params;
   const { serverUrl, token } = useAuth();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
@@ -136,7 +138,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         }
       })
       .catch(e => {
-        Alert.alert('Could not load recipe', e instanceof Error ? e.message : 'Unknown error');
+        Alert.alert(t('recipeEdit.genericLoadErrorTitle'), e instanceof Error ? e.message : t('recipeEdit.unknownError'));
         navigation.goBack();
       })
       .finally(() => setLoading(false));
@@ -146,7 +148,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
   const handleSave = async () => {
     if (!recipe) return;
     const trimmedName = name.trim();
-    if (!trimmedName) { Alert.alert('Recipe name is required'); return; }
+    if (!trimmedName) { Alert.alert(t('recipeEdit.nameRequiredAlert')); return; }
     setSaving(true);
     try {
       await api.updateRecipe(slug, {
@@ -174,7 +176,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
       });
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Save failed', e instanceof Error ? e.message : 'Could not save recipe');
+      Alert.alert(t('recipeEdit.saveFailedTitle'), e instanceof Error ? e.message : t('recipeEdit.genericSaveError'));
     } finally {
       setSaving(false);
     }
@@ -196,13 +198,13 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
     >
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.topBarCancel}>Cancel</Text>
+          <Text style={styles.topBarCancel}>{t('common.cancel')}</Text>
         </TouchableOpacity>
-        <Text style={styles.topBarTitle}>Edit Recipe</Text>
+        <Text style={styles.topBarTitle}>{t('recipeEdit.title')}</Text>
         <TouchableOpacity onPress={handleSave} disabled={saving}>
           {saving
             ? <ActivityIndicator color={colors.primary} size="small" />
-            : <Text style={styles.topBarSave}>Save</Text>
+            : <Text style={styles.topBarSave}>{t('recipeEdit.save')}</Text>
           }
         </TouchableOpacity>
       </View>
@@ -226,7 +228,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
           ) : (
             <View style={photoStyles.placeholder}>
               <Text style={photoStyles.placeholderIcon}>📷</Text>
-              <Text style={photoStyles.placeholderText}>Add a photo</Text>
+              <Text style={photoStyles.placeholderText}>{t('recipeEdit.addPhoto')}</Text>
             </View>
           )}
           {imageUploading && (
@@ -237,26 +239,26 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         </TouchableOpacity>
 
         {/* ── Basic Info ──────────────────────────────────── */}
-        <SectionLabel title="BASIC INFO" />
+        <SectionLabel title={t('recipeEdit.basicInfoLabel')} />
 
         <View style={styles.field}>
-          <Text style={styles.label}>Recipe Name *</Text>
+          <Text style={styles.label}>{t('recipeEdit.nameLabel')}</Text>
           <TextInput
             style={styles.input}
             value={name}
             onChangeText={setName}
-            placeholder="e.g. Spaghetti Bolognese"
+            placeholder={t('recipeEdit.namePlaceholder')}
             placeholderTextColor={colors.textDisabled}
           />
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Description</Text>
+          <Text style={styles.label}>{t('recipeEdit.descriptionLabel')}</Text>
           <TextInput
             style={[styles.input, styles.multiline]}
             value={description}
             onChangeText={setDescription}
-            placeholder="Short description of this dish..."
+            placeholder={t('recipeEdit.descriptionPlaceholder')}
             placeholderTextColor={colors.textDisabled}
             multiline
             numberOfLines={3}
@@ -265,44 +267,44 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Servings / Yield</Text>
+          <Text style={styles.label}>{t('recipeEdit.servingsYieldLabel')}</Text>
           <TextInput
             style={styles.input}
             value={recipeYield}
             onChangeText={setRecipeYield}
-            placeholder="e.g. 4 servings"
+            placeholder={t('recipeEdit.servingsYieldPlaceholder')}
             placeholderTextColor={colors.textDisabled}
           />
         </View>
 
         <View style={styles.timeRow}>
           <View style={[styles.field, styles.timeField]}>
-            <Text style={styles.label}>Prep Time</Text>
+            <Text style={styles.label}>{t('recipeEdit.prepTimeLabel')}</Text>
             <TextInput
               style={styles.input}
               value={prepTime}
               onChangeText={setPrepTime}
-              placeholder="15 min"
+              placeholder={t('recipeEdit.prepTimePlaceholder')}
               placeholderTextColor={colors.textDisabled}
             />
           </View>
           <View style={[styles.field, styles.timeField]}>
-            <Text style={styles.label}>Cook Time</Text>
+            <Text style={styles.label}>{t('recipeEdit.cookTimeLabel')}</Text>
             <TextInput
               style={styles.input}
               value={performTime}
               onChangeText={setPerformTime}
-              placeholder="30 min"
+              placeholder={t('recipeEdit.cookTimePlaceholder')}
               placeholderTextColor={colors.textDisabled}
             />
           </View>
           <View style={[styles.field, styles.timeField]}>
-            <Text style={styles.label}>Total Time</Text>
+            <Text style={styles.label}>{t('recipeEdit.totalTimeLabel')}</Text>
             <TextInput
               style={styles.input}
               value={totalTime}
               onChangeText={setTotalTime}
-              placeholder="45 min"
+              placeholder={t('recipeEdit.totalTimePlaceholder')}
               placeholderTextColor={colors.textDisabled}
             />
           </View>
@@ -310,10 +312,10 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
 
         {/* ── Ingredients ─────────────────────────────────── */}
         <View style={sectionStyles.headerRow}>
-          <SectionLabel title="INGREDIENTS" />
+          <SectionLabel title={t('recipeEdit.ingredientsLabel')} />
           {ingredients.some(i => i.text.trim()) && (
             <TouchableOpacity onPress={() => setShowParseModal(true)}>
-              <Text style={sectionStyles.addBtnText}>🪄 Parse Ingredients</Text>
+              <Text style={sectionStyles.addBtnText}>{t('recipeEdit.parseIngredientsButton')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -327,7 +329,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
                 onChangeText={title =>
                   setIngredients(prev => prev.map(i => i.key === ing.key ? { ...i, title } : i))
                 }
-                placeholder="Section title (e.g. Sauce)"
+                placeholder={t('recipeEdit.sectionTitlePlaceholder')}
                 placeholderTextColor={colors.textDisabled}
               />
             )}
@@ -341,7 +343,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
                   <TouchableOpacity
                     onPress={() => setIngredients(prev => prev.map(i => i.key === ing.key ? { ...i, parsed: undefined } : i))}
                   >
-                    <Text style={styles.editAsTextLink}>Edit as text</Text>
+                    <Text style={styles.editAsTextLink}>{t('recipeEdit.editAsText')}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -351,7 +353,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
                   onChangeText={text =>
                     setIngredients(prev => prev.map(i => i.key === ing.key ? { ...i, text } : i))
                   }
-                  placeholder="e.g. 2 cups all-purpose flour"
+                  placeholder={t('recipeEdit.ingredientPlaceholder')}
                   placeholderTextColor={colors.textDisabled}
                   multiline
                 />
@@ -378,12 +380,12 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         ))}
 
         <AddBtn
-          label="Add Ingredient"
+          label={t('recipeEdit.addIngredientButton')}
           onPress={() => setIngredients(prev => [...prev, { key: uid(), text: '' }])}
         />
 
         {/* ── Instructions ────────────────────────────────── */}
-        <SectionLabel title="INSTRUCTIONS" />
+        <SectionLabel title={t('recipeEdit.instructionsLabel')} />
 
         {steps.map((step, idx) => (
           <View key={step.key} style={styles.stepBlock}>
@@ -397,7 +399,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
                 onChangeText={v =>
                   setSteps(prev => prev.map(s => s.key === step.key ? { ...s, title: v } : s))
                 }
-                placeholder="Step title (optional)"
+                placeholder={t('recipeEdit.stepTitlePlaceholder')}
                 placeholderTextColor={colors.textDisabled}
               />
               <TouchableOpacity
@@ -414,7 +416,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
               onChangeText={v =>
                 setSteps(prev => prev.map(s => s.key === step.key ? { ...s, text: v } : s))
               }
-              placeholder="Describe this step..."
+              placeholder={t('recipeEdit.stepBodyPlaceholder')}
               placeholderTextColor={colors.textDisabled}
               multiline
               numberOfLines={3}
@@ -424,23 +426,23 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         ))}
 
         <AddBtn
-          label="Add Step"
+          label={t('recipeEdit.addStepButton')}
           onPress={() => setSteps(prev => [...prev, { key: uid(), title: '', text: '' }])}
         />
 
         {/* ── Tags ────────────────────────────────────────── */}
         {availableTags.length > 0 && (
           <>
-            <SectionLabel title="TAGS" />
+            <SectionLabel title={t('recipeEdit.tagsLabel')} />
             <View style={styles.chipRow}>
               {availableTags.map(tag => {
-                const active = selectedTags.some(t => t.slug === tag.slug);
+                const active = selectedTags.some(sel => sel.slug === tag.slug);
                 return (
                   <TouchableOpacity
                     key={tag.slug}
                     style={[styles.chip, active && styles.chipActive]}
                     onPress={() => setSelectedTags(prev =>
-                      active ? prev.filter(t => t.slug !== tag.slug) : [...prev, tag]
+                      active ? prev.filter(sel => sel.slug !== tag.slug) : [...prev, tag]
                     )}
                   >
                     <Text style={[styles.chipText, active && styles.chipTextActive]}>
@@ -456,7 +458,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         {/* ── Categories ──────────────────────────────────── */}
         {availableCategories.length > 0 && (
           <>
-            <SectionLabel title="CATEGORIES" />
+            <SectionLabel title={t('recipeEdit.categoriesLabel')} />
             <View style={styles.chipRow}>
               {availableCategories.map(cat => {
                 const active = selectedCategories.some(c => c.slug === cat.slug);
@@ -479,7 +481,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         )}
 
         {/* ── Notes ───────────────────────────────────────── */}
-        <SectionLabel title="NOTES" />
+        <SectionLabel title={t('recipeEdit.notesLabel')} />
 
         {notes.map(note => (
           <View key={note.key} style={styles.noteBlock}>
@@ -490,7 +492,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
                 onChangeText={v =>
                   setNotes(prev => prev.map(n => n.key === note.key ? { ...n, title: v } : n))
                 }
-                placeholder="Note title"
+                placeholder={t('recipeEdit.noteTitlePlaceholder')}
                 placeholderTextColor={colors.textDisabled}
               />
               <TouchableOpacity
@@ -507,7 +509,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
               onChangeText={v =>
                 setNotes(prev => prev.map(n => n.key === note.key ? { ...n, text: v } : n))
               }
-              placeholder="Note content..."
+              placeholder={t('recipeEdit.noteBodyPlaceholder')}
               placeholderTextColor={colors.textDisabled}
               multiline
               numberOfLines={3}
@@ -517,17 +519,17 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
         ))}
 
         <AddBtn
-          label="Add Note"
+          label={t('recipeEdit.addNoteButton')}
           onPress={() => setNotes(prev => [...prev, { key: uid(), title: '', text: '' }])}
         />
 
         {/* ── Attachments ─────────────────────────────────── */}
         <View style={sectionStyles.headerRow}>
-          <SectionLabel title="ATTACHMENTS" />
+          <SectionLabel title={t('recipeEdit.attachmentsLabel')} />
           <TouchableOpacity onPress={handleAddAttachment} disabled={attachmentUploading}>
             {attachmentUploading
               ? <ActivityIndicator color={colors.primary} size="small" />
-              : <Text style={sectionStyles.addBtnText}>+ Add</Text>
+              : <Text style={sectionStyles.addBtnText}>{t('recipeDetail.addAttachmentButton')}</Text>
             }
           </TouchableOpacity>
         </View>
@@ -536,15 +538,15 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
             key={i}
             style={styles.assetItem}
             onPress={() => recipe && Linking.openURL(recipeAssetUrl(serverUrl, recipe.id, asset.fileName)).catch(() =>
-              Alert.alert('Cannot open', 'Could not open this file.')
+              Alert.alert(t('recipeDetail.cannotOpenTitle'), t('recipeDetail.cannotOpenMsg'))
             )}
           >
             <Text style={styles.assetIcon}>📎</Text>
             <Text style={styles.assetName} numberOfLines={1}>{asset.name || asset.fileName}</Text>
-            <Text style={styles.assetOpen}>Open ›</Text>
+            <Text style={styles.assetOpen}>{t('recipeDetail.openAction')}</Text>
           </TouchableOpacity>
         )) : (
-          <Text style={styles.emptyText}>No attachments yet</Text>
+          <Text style={styles.emptyText}>{t('recipeDetail.noAttachments')}</Text>
         )}
 
         <View style={{ height: spacing.xxl }} />
@@ -552,7 +554,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
 
       <IngredientParseReviewModal
         visible={showParseModal}
-        ingredientLines={ingredients.map(i => i.text).filter(t => t.trim())}
+        ingredientLines={ingredients.map(i => i.text).filter(text => text.trim())}
         onCancel={() => setShowParseModal(false)}
         onComplete={result => {
           setIngredients(result.map(ing => ({
