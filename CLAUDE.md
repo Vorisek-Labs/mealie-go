@@ -462,6 +462,26 @@ Storage/plumbing lives in `mealieApi.ts`:
 - `login()` sends these headers on the `/api/auth/token` call too, since the proxy sits in front of
   that endpoint as well, not just authenticated requests.
 
+**Two real bugs found and fixed 2026-07-19**, after a different user reported "the headers should
+work, I only get invalid username, but it can't be wrong — same credentials connect locally":
+- `headersToRecord()` trimmed the header **name** but never the **value**. A pasted API key with
+  invisible leading/trailing whitespace (easy to pick up from a web page/terminal/password manager)
+  went out byte-for-byte wrong; most reverse proxies exact-match header values, so one stray space
+  silently breaks it. Now trims both.
+- `login()`'s error handling swallowed **any non-JSON response** into a hardcoded "Invalid username
+  or password", regardless of actual cause. Mealie's own auth handler always returns JSON; a
+  non-JSON response (HTML block page, WAF, load balancer) means something in front of Mealie
+  rejected the request before credentials were ever checked — exactly what a wrong/rejected proxy
+  header produces, and exactly what this bug mislabeled as a bad password. Fixed to: real `detail`
+  from Mealie (e.g. "User is locked out", HTTP 423) → show it; valid JSON with no usable detail
+  (Mealie's own bare 401 for wrong credentials) → keep the friendly message; **not valid JSON at
+  all → show the raw `status: body snippet`** instead of guessing it's a credentials problem.
+  `request()` already did the equivalent for authenticated calls; `login()` now matches it.
+
+Root cause not confirmed for the reporting user specifically (no way to reproduce their exact proxy
+setup) — both fixes are real and worth having regardless. If reported broken again, the improved
+error message itself should now carry the actual diagnosis.
+
 ### Unit system toggle & PDF export — no server API, done client-side
 Mealie's own server-side unit-conversion feature (`GET /api/recipes/{slug}/conversions`) was an
 **unmerged, unreleased PR** as of 2026-07 (targets `mealie-next`, not in any stable release) — do
@@ -705,6 +725,19 @@ login section above for exactly what `reason` values the manual check now report
   locale file, not just a formality — always re-run it after touching locale JSON by hand.
 - `npx tsc --noEmit` clean. Not device-tested (no device connected). Bumped to `1.4.1`/versionCode
   `14`, shipped all three surfaces.
+
+### Session 2026-07-19 — proxy-header trim + honest login errors, v1.4.2
+A different user reported proxy headers "should work" but login always fails with "invalid
+username," despite the same credentials working when connecting locally (bypassing the proxy).
+Deep-dove Mealie's docs again first (installation/backend-config.md — found the account-lockout
+policy, `SECURITY_MAX_LOGIN_ATTEMPTS`/`SECURITY_USER_LOCKOUT_TIME`, and confirmed nothing
+Mealie-side needs special handling for arbitrary custom headers), then re-audited our own proxy
+header code line by line rather than guessing. See the new note in the Custom proxy headers section
+above for the two real bugs found (value-trimming, honest non-JSON error surfacing in `login()`).
+Root cause not confirmed for this specific user — no way to reproduce their proxy setup — but both
+fixes are real regardless, and the improved error message should self-diagnose if it recurs.
+`npx tsc --noEmit` clean. Not device-tested (no device connected). Bumped to `1.4.2`/versionCode
+`15`, shipped all three surfaces.
 
 ### Session 2026-07-18 (part 4) — first live SSO report, hardened OidcLoginModal, v1.3.4
 A user (Authentik provider) updated to v1.3.0 and reported the exact untested risk flagged since
