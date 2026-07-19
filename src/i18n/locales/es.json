@@ -66,5 +66,68 @@
     "signOutTitle": "Cerrar sesión",
     "signOutConfirm": "¿Desconectar de este servidor Mealie?",
     "cancel": "Cancelar"
+  },
+  "welcome": {
+    "title": "Bienvenido a Mealie Go",
+    "subtitle": "Explora recetas, planifica comidas y gestiona listas de compras — todo conectado a tu propio servidor Mealie. Aquí tienes un vistazo rápido de lo que puedes hacer.",
+    "viewGuide": "Ver guía rápida",
+    "continueToApp": "Continuar a la app"
+  },
+  "guide": {
+    "headerTitle": "Guía rápida",
+    "close": "Cerrar",
+    "intro": "Un recordatorio rápido de lo que Mealie Go puede hacer — ve directamente a una sección o desplázate por todo el contenido.",
+    "recipes": {
+      "title": "Recetas",
+      "tips": [
+        "Busca recetas o toca ▤ para filtrar por categoría, etiqueta, utensilio o ingrediente.",
+        "Toca ♡ en una receta para marcarla como favorita — toca el botón ♡/♥ en la parte superior de la lista para ver solo tus favoritas.",
+        "Toca 🎲 para ir a una receta al azar.",
+        "Toca 🥕 para abrir «¿Qué puedo cocinar?» — elige los ingredientes y utensilios que tengas a mano, y te sugerirá recetas que puedes preparar, indicando lo que aún te falta.",
+        "Añade una receta con el botón +: pega una URL para importarla, o escribe una a mano.",
+        "En una receta puedes ajustar las porciones, cambiar las unidades de los ingredientes a métrico, valorarla y dejar comentarios.",
+        "Toca «Añadir ingredientes a la lista de compras» en una receta para enviar sus ingredientes directamente a una de tus listas.",
+        "Toca el icono de la cámara en la foto de una receta para reemplazarla, y añade archivos en Adjuntos.",
+        "Compartir crea un enlace que cualquiera puede abrir — incluso sin cuenta de Mealie.",
+        "Exportar convierte una receta en un PDF que puedes imprimir o enviar."
+      ]
+    },
+    "mealPlan": {
+      "title": "Plan de comidas",
+      "tips": [
+        "Usa las flechas ‹ › para moverte entre semanas, y toca un día para ver lo planificado.",
+        "Toca + en Desayuno, Almuerzo, Cena o Guarnición para añadir una receta o una nota rápida de texto.",
+        "«Sorpréndeme» elige una receta al azar de tu colección por ti.",
+        "Toca ✕ en cualquier entrada para eliminarla del plan."
+      ]
+    },
+    "shopping": {
+      "title": "Listas de compras",
+      "tips": [
+        "Crea tantas listas como quieras con el botón +.",
+        "Añade artículos escribiéndolos, o envía los ingredientes de una receta directamente a una lista desde la pantalla de esa receta.",
+        "«🍽 Desde recetas» en una lista te permite buscar y seleccionar varias recetas a la vez — añade todos sus ingredientes a la lista de una sola vez.",
+        "«🗓 Desde el plan de comidas» añade automáticamente los ingredientes de todo lo planificado para la semana actual.",
+        "Toca un artículo para marcarlo — los artículos marcados se mueven al final de la lista.",
+        "Mantén pulsada una lista para eliminarla."
+      ]
+    },
+    "cookbooks": {
+      "title": "Recetarios",
+      "tips": [
+        "Los recetarios agrupan recetas. Crea uno con + y dale un nombre y una descripción.",
+        "Mantén pulsado un recetario para editarlo o eliminarlo.",
+        "Marca un recetario como Público para que se pueda ver sin necesidad de una cuenta.",
+        "Dentro de un recetario tienes la misma búsqueda, filtros y el botón aleatorio 🎲 que en la lista principal de recetas — útil para acotar un recetario grande."
+      ]
+    },
+    "settings": {
+      "title": "Ajustes",
+      "tips": [
+        "Cambia cómo se muestran las cantidades de los ingredientes entre «Como está escrito» y «Métrico».",
+        "Comprueba a qué servidor, grupo y hogar estás conectado actualmente.",
+        "Cierra sesión aquí para conectarte a un servidor Mealie diferente."
+      ]
+    }
   }
 }

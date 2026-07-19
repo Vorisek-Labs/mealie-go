@@ -66,5 +66,68 @@
     "signOutTitle": "Sair",
     "signOutConfirm": "Desconectar deste servidor Mealie?",
     "cancel": "Cancelar"
+  },
+  "welcome": {
+    "title": "Bem-vindo ao Mealie Go",
+    "subtitle": "Explore receitas, planeje refeições e gerencie listas de compras — tudo conectado ao seu próprio servidor Mealie. Aqui está uma rápida visão do que você pode fazer.",
+    "viewGuide": "Ver guia rápido",
+    "continueToApp": "Continuar para o aplicativo"
+  },
+  "guide": {
+    "headerTitle": "Guia rápido",
+    "close": "Fechar",
+    "intro": "Um lembrete rápido do que o Mealie Go pode fazer — vá direto a uma seção ou percorra tudo.",
+    "recipes": {
+      "title": "Receitas",
+      "tips": [
+        "Pesquise receitas ou toque em ▤ para filtrar por categoria, tag, utensílio ou ingrediente.",
+        "Toque em ♡ em uma receita para favoritá-la — toque no botão ♡/♥ no topo da lista para ver apenas os favoritos.",
+        "Toque em 🎲 para ir a uma receita aleatória.",
+        "Toque em 🥕 para abrir \"O que posso cozinhar?\" — escolha os ingredientes e utensílios que você tem à mão, e ele sugere receitas que você pode fazer, indicando o que ainda falta.",
+        "Adicione uma receita com o botão +: cole uma URL para importá-la, ou digite uma manualmente.",
+        "Em uma receita, você pode ajustar as porções, mudar as unidades dos ingredientes para métrico, avaliá-la e deixar comentários.",
+        "Toque em \"Adicionar ingredientes à lista de compras\" em uma receita para enviar seus ingredientes diretamente para uma de suas listas.",
+        "Toque no ícone da câmera em uma foto de receita para substituí-la, e adicione arquivos em Anexos.",
+        "Compartilhar cria um link que qualquer pessoa pode abrir — mesmo sem uma conta Mealie.",
+        "Exportar transforma uma receita em um PDF que você pode imprimir ou enviar."
+      ]
+    },
+    "mealPlan": {
+      "title": "Plano de refeições",
+      "tips": [
+        "Use as setas ‹ › para navegar entre as semanas, e toque em um dia para ver o que está planejado.",
+        "Toque em + em Café da manhã, Almoço, Jantar ou Acompanhamento para adicionar uma receita ou uma nota rápida de texto.",
+        "\"Me surpreenda\" escolhe uma receita aleatória da sua coleção para você.",
+        "Toque em ✕ em qualquer entrada para removê-la do plano."
+      ]
+    },
+    "shopping": {
+      "title": "Listas de compras",
+      "tips": [
+        "Crie quantas listas quiser com o botão +.",
+        "Adicione itens digitando-os, ou envie os ingredientes de uma receita diretamente para uma lista a partir da tela dessa receita.",
+        "\"🍽 De receitas\" em uma lista permite pesquisar e selecionar várias receitas de uma vez — adiciona todos os ingredientes delas à lista de uma só vez.",
+        "\"🗓 Do plano de refeições\" adiciona automaticamente os ingredientes de tudo o que está planejado para a semana atual.",
+        "Toque em um item para marcá-lo — itens marcados vão para o final da lista.",
+        "Toque e segure em uma lista para excluí-la."
+      ]
+    },
+    "cookbooks": {
+      "title": "Livros de receitas",
+      "tips": [
+        "Livros de receitas agrupam receitas. Crie um com + e dê a ele um nome e uma descrição.",
+        "Toque e segure em um livro de receitas para editá-lo ou excluí-lo.",
+        "Marque um livro de receitas como Público para torná-lo visível sem uma conta.",
+        "Dentro de um livro de receitas você tem a mesma busca, filtros e botão aleatório 🎲 da lista principal de receitas — útil para restringir um livro grande."
+      ]
+    },
+    "settings": {
+      "title": "Configurações",
+      "tips": [
+        "Alterne como as quantidades dos ingredientes são exibidas entre \"Como escrito\" e \"Métrico\".",
+        "Verifique a qual servidor, grupo e residência você está conectado no momento.",
+        "Saia da conta aqui para se conectar a um servidor Mealie diferente."
+      ]
+    }
   }
 }

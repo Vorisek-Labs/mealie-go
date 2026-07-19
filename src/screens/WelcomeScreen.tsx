@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { setHasSeenWelcome } from '../lib/onboarding';
 import { colors, radius, spacing, typography } from '../theme';
 import type { RootStackParams } from '../navigation/RootNavigator';
@@ -10,6 +11,7 @@ type Props = {
 };
 
 export default function WelcomeScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
 
   const handleContinue = async () => {
@@ -28,19 +30,18 @@ export default function WelcomeScreen({ navigation }: Props) {
     <View style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.icon}>🍽️</Text>
-        <Text style={styles.title}>Welcome to Mealie Go</Text>
+        <Text style={styles.title}>{t('welcome.title')}</Text>
         <Text style={styles.subtitle}>
-          Browse recipes, plan meals, and manage shopping lists — all connected to your own
-          Mealie server. Here's a quick look at what you can do.
+          {t('welcome.subtitle')}
         </Text>
       </View>
 
       <View style={styles.actions}>
         <TouchableOpacity style={styles.primaryBtn} onPress={handleViewGuide} disabled={busy}>
-          <Text style={styles.primaryBtnText}>View Quick Guide</Text>
+          <Text style={styles.primaryBtnText}>{t('welcome.viewGuide')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.secondaryBtn} onPress={handleContinue} disabled={busy}>
-          <Text style={styles.secondaryBtnText}>Continue to App</Text>
+          <Text style={styles.secondaryBtnText}>{t('welcome.continueToApp')}</Text>
         </TouchableOpacity>
       </View>
     </View>

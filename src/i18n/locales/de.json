@@ -66,5 +66,68 @@
     "signOutTitle": "Abmelden",
     "signOutConfirm": "Verbindung zu diesem Mealie-Server trennen?",
     "cancel": "Abbrechen"
+  },
+  "welcome": {
+    "title": "Willkommen bei Mealie Go",
+    "subtitle": "Durchsuche Rezepte, plane Mahlzeiten und verwalte Einkaufslisten — alles verbunden mit deinem eigenen Mealie-Server. Hier ist ein kurzer Überblick, was du tun kannst.",
+    "viewGuide": "Kurzanleitung ansehen",
+    "continueToApp": "Weiter zur App"
+  },
+  "guide": {
+    "headerTitle": "Kurzanleitung",
+    "close": "Schließen",
+    "intro": "Eine kurze Erinnerung daran, was Mealie Go kann — springe zu einem Abschnitt oder scrolle durch alles.",
+    "recipes": {
+      "title": "Rezepte",
+      "tips": [
+        "Suche nach Rezepten oder tippe auf ▤, um nach Kategorie, Tag, Werkzeug oder Zutat zu filtern.",
+        "Tippe auf ♡ bei einem Rezept, um es zu favorisieren — tippe auf die ♡/♥-Schaltfläche oben in der Liste, um nur Favoriten zu sehen.",
+        "Tippe auf 🎲, um zu einem zufälligen Rezept zu springen.",
+        "Tippe auf 🥕, um „Was kann ich kochen?“ zu öffnen — wähle die Zutaten und Werkzeuge aus, die du zur Hand hast, und es schlägt Rezepte vor, die du zubereiten kannst, und zeigt an, was dir noch fehlt.",
+        "Füge ein Rezept mit der +-Schaltfläche hinzu: Füge eine URL ein, um es zu importieren, oder gib eines von Hand ein.",
+        "Bei einem Rezept kannst du die Portionen skalieren, die Zutateneinheiten auf Metrisch umstellen, es bewerten und Kommentare hinterlassen.",
+        "Tippe bei einem Rezept auf „Zutaten zur Einkaufsliste hinzufügen“, um dessen Zutaten direkt an eine deiner Listen zu senden.",
+        "Tippe auf das Kamera-Symbol bei einem Rezeptfoto, um es zu ersetzen, und füge Dateien unter Anhänge hinzu.",
+        "Teilen erstellt einen Link, den jeder öffnen kann — auch ohne Mealie-Konto.",
+        "Export wandelt ein Rezept in ein PDF um, das du drucken oder versenden kannst."
+      ]
+    },
+    "mealPlan": {
+      "title": "Essensplan",
+      "tips": [
+        "Verwende die ‹ ›-Pfeile, um zwischen Wochen zu wechseln, und tippe auf einen Tag, um zu sehen, was geplant ist.",
+        "Tippe auf + bei Frühstück, Mittagessen, Abendessen oder Beilage, um ein Rezept oder eine kurze Textnotiz hinzuzufügen.",
+        "„Überrasch mich“ wählt zufällig ein Rezept aus deiner Sammlung für dich aus.",
+        "Tippe auf ✕ bei einem Eintrag, um ihn aus dem Plan zu entfernen."
+      ]
+    },
+    "shopping": {
+      "title": "Einkaufslisten",
+      "tips": [
+        "Erstelle mit der +-Schaltfläche so viele Listen, wie du möchtest.",
+        "Füge Artikel hinzu, indem du sie eintippst, oder sende die Zutaten eines Rezepts direkt vom Rezeptbildschirm aus an eine Liste.",
+        "„🍽 Aus Rezepten“ auf einer Liste ermöglicht es dir, mehrere Rezepte gleichzeitig zu suchen und auszuwählen — es fügt alle ihre Zutaten auf einmal zur Liste hinzu.",
+        "„🗓 Aus Essensplan“ fügt automatisch die Zutaten für alles hinzu, was in der aktuellen Woche geplant ist.",
+        "Tippe auf einen Artikel, um ihn abzuhaken — abgehakte Artikel wandern ans Ende der Liste.",
+        "Halte eine Liste gedrückt, um sie zu löschen."
+      ]
+    },
+    "cookbooks": {
+      "title": "Kochbücher",
+      "tips": [
+        "Kochbücher gruppieren Rezepte. Erstelle eines mit + und gib ihm einen Namen und eine Beschreibung.",
+        "Halte ein Kochbuch gedrückt, um es zu bearbeiten oder zu löschen.",
+        "Markiere ein Kochbuch als Öffentlich, damit es auch ohne Konto sichtbar ist.",
+        "In einem Kochbuch stehen dir dieselbe Suche, Filter und die 🎲-Zufallsschaltfläche wie in der Hauptrezeptliste zur Verfügung — praktisch, um ein großes Kochbuch einzugrenzen."
+      ]
+    },
+    "settings": {
+      "title": "Einstellungen",
+      "tips": [
+        "Wechsle, wie Zutatenmengen angezeigt werden, zwischen „Wie angegeben“ und „Metrisch“.",
+        "Überprüfe, mit welchem Server, welcher Gruppe und welchem Haushalt du gerade verbunden bist.",
+        "Melde dich hier ab, um dich mit einem anderen Mealie-Server zu verbinden."
+      ]
+    }
   }
 }

@@ -66,5 +66,68 @@
     "signOutTitle": "Se déconnecter",
     "signOutConfirm": "Se déconnecter de ce serveur Mealie ?",
     "cancel": "Annuler"
+  },
+  "welcome": {
+    "title": "Bienvenue sur Mealie Go",
+    "subtitle": "Parcourez des recettes, planifiez des repas et gérez des listes de courses — le tout connecté à votre propre serveur Mealie. Voici un aperçu rapide de ce que vous pouvez faire.",
+    "viewGuide": "Voir le guide rapide",
+    "continueToApp": "Continuer vers l'application"
+  },
+  "guide": {
+    "headerTitle": "Guide rapide",
+    "close": "Fermer",
+    "intro": "Un petit rappel de ce que Mealie Go peut faire — allez directement à une section ou parcourez le tout.",
+    "recipes": {
+      "title": "Recettes",
+      "tips": [
+        "Recherchez des recettes ou appuyez sur ▤ pour filtrer par catégorie, étiquette, ustensile ou ingrédient.",
+        "Appuyez sur ♡ sur une recette pour la mettre en favori — appuyez sur le bouton ♡/♥ en haut de la liste pour ne voir que vos favoris.",
+        "Appuyez sur 🎲 pour accéder à une recette aléatoire.",
+        "Appuyez sur 🥕 pour ouvrir « Que puis-je cuisiner ? » — choisissez les ingrédients et ustensiles que vous avez sous la main, et l'appli suggère des recettes réalisables, en signalant ce qu'il vous manque encore.",
+        "Ajoutez une recette avec le bouton + : collez une URL pour l'importer, ou saisissez-en une manuellement.",
+        "Sur une recette, vous pouvez ajuster les portions, passer les unités des ingrédients en métrique, la noter et laisser des commentaires.",
+        "Appuyez sur « Ajouter les ingrédients à la liste de courses » sur une recette pour envoyer ses ingrédients directement vers l'une de vos listes.",
+        "Appuyez sur l'icône appareil photo d'une photo de recette pour la remplacer, et ajoutez des fichiers sous Pièces jointes.",
+        "Le partage crée un lien que n'importe qui peut ouvrir — même sans compte Mealie.",
+        "L'export transforme une recette en PDF que vous pouvez imprimer ou envoyer."
+      ]
+    },
+    "mealPlan": {
+      "title": "Planning des repas",
+      "tips": [
+        "Utilisez les flèches ‹ › pour naviguer entre les semaines, et appuyez sur un jour pour voir ce qui est prévu.",
+        "Appuyez sur + à Petit-déjeuner, Déjeuner, Dîner ou Accompagnement pour ajouter une recette ou une note rapide.",
+        "« Surprends-moi » choisit une recette au hasard dans votre collection.",
+        "Appuyez sur ✕ sur une entrée pour la retirer du planning."
+      ]
+    },
+    "shopping": {
+      "title": "Listes de courses",
+      "tips": [
+        "Créez autant de listes que vous le souhaitez avec le bouton +.",
+        "Ajoutez des articles en les saisissant, ou envoyez les ingrédients d'une recette directement vers une liste depuis l'écran de cette recette.",
+        "« 🍽 Depuis des recettes » sur une liste permet de rechercher et sélectionner plusieurs recettes à la fois — cela ajoute tous leurs ingrédients à la liste en une seule fois.",
+        "« 🗓 Depuis le planning » ajoute automatiquement les ingrédients de tout ce qui est prévu pour la semaine en cours.",
+        "Appuyez sur un article pour le cocher — les articles cochés descendent en bas de la liste.",
+        "Appui long sur une liste pour la supprimer."
+      ]
+    },
+    "cookbooks": {
+      "title": "Livres de recettes",
+      "tips": [
+        "Les livres de recettes regroupent des recettes. Créez-en un avec + et donnez-lui un nom et une description.",
+        "Appui long sur un livre de recettes pour le modifier ou le supprimer.",
+        "Marquez un livre de recettes comme Public pour qu'il soit consultable sans compte.",
+        "Dans un livre de recettes, vous retrouvez la même recherche, les mêmes filtres et le bouton aléatoire 🎲 que dans la liste principale des recettes — pratique pour affiner un grand livre de recettes."
+      ]
+    },
+    "settings": {
+      "title": "Paramètres",
+      "tips": [
+        "Changez la façon dont les quantités d'ingrédients sont affichées entre « Tel qu'écrit » et « Métrique ».",
+        "Vérifiez à quel serveur, groupe et foyer vous êtes actuellement connecté.",
+        "Déconnectez-vous ici pour vous connecter à un autre serveur Mealie."
+      ]
+    }
   }
 }
