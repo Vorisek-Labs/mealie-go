@@ -391,6 +391,17 @@ API-token path works regardless. If the refresh-probe approach is reported broke
 user's exact Mealie server version first; `/api/auth/refresh` + cookie fallback existing on their
 version is the thing to verify.
 
+**Diagnostic detail on failure (v1.4.1)** — added after being asked directly whether a fallback
+readout existed for exactly this "still doesn't work" case (it didn't, until this). The manual
+"I've signed in" check's `not-found` message now carries a `reason` string reported by the injected
+JS: `wrong-origin: currently on <url>` (WebView wasn't on the Mealie origin when checked — useful if
+a redirect landed somewhere unexpected), `http-<status> <statusText>` (server reached but rejected
+the request), `fetch-error: <message>` (network/CORS failure, never reached the server), or
+`unexpected-response: <truncated body>` (200 OK but no `access_token` in the JSON). Shown verbatim
+in the alert (deliberately untranslated — it's meant to be relayed back in a bug report, not
+localized UI copy). If SSO is reported broken again, ask for this exact string before guessing
+further — it should make the next diagnosis a single round-trip instead of several.
+
 ### Localization (i18n) — in progress, not a Mealie API
 Added 2026-07-18 after user feedback ("we need language support!"). This app's UI has ~15 screens
 and 500+ hardcoded English strings — translating everything in one pass wasn't realistic, so this
@@ -683,6 +694,17 @@ instead of ever reading the cookie.
   today). Bumped to `1.4.0`/versionCode `13`, shipped all three surfaces. Release notes ask the
   user to include their Mealie server version if SSO still fails, and point at the API-token path
   as the works-regardless option.
+
+### Session 2026-07-18 (part 6) — SSO diagnostic readout, v1.4.1
+Ken asked directly: "did you add the advanced error readout just in case this fix doesn't cut it?"
+It hadn't been. Added one — see the new "Diagnostic detail on failure" note in the SSO / OIDC
+login section above for exactly what `reason` values the manual check now reports and displays.
+- Also caught (via `tsc`, before committing) a JSON syntax bug an editor introduced in `zh.json`
+  while adding the new key — smart/curly quotes substituted for two keys' string delimiters. Never
+  shipped; worth remembering that `resolveJsonModule` makes `tsc` a real syntax check for every
+  locale file, not just a formality — always re-run it after touching locale JSON by hand.
+- `npx tsc --noEmit` clean. Not device-tested (no device connected). Bumped to `1.4.1`/versionCode
+  `14`, shipped all three surfaces.
 
 ### Session 2026-07-18 (part 4) — first live SSO report, hardened OidcLoginModal, v1.3.4
 A user (Authentik provider) updated to v1.3.0 and reported the exact untested risk flagged since
