@@ -1,4 +1,42 @@
 {
+  "common": {
+    "cancel": "Отмена",
+    "clearAll": "Очистить всё",
+    "apply": "Применить",
+    "applyWithCount": "Применить ({{count}})",
+    "createOption": "+ Создать «{{name}}»",
+    "noMatchesCreateNew": "Совпадений нет — создайте новый вариант выше.",
+    "searchOrTypeNew": "Найдите или введите новое название…"
+  },
+  "time": {
+    "hrMin": "{{hours}} ч {{minutes}} мин",
+    "hrOnly": "{{hours}} ч",
+    "minOnly": "{{minutes}} мин",
+    "bucket15": "15 мин или меньше",
+    "bucket30": "30 мин или меньше",
+    "bucket60": "1 час или меньше",
+    "bucket120": "2 часа или меньше",
+    "bucketGeneric": "{{minutes}} мин или меньше",
+    "prepLabel": "Подготовка: {{time}}",
+    "cookLabel": "Готовка: {{time}}"
+  },
+  "filterModal": {
+    "title": "Фильтр рецептов",
+    "categories": "КАТЕГОРИИ",
+    "prepTime": "ВРЕМЯ ПОДГОТОВКИ",
+    "cookTime": "ВРЕМЯ ГОТОВКИ",
+    "tags": "ТЕГИ",
+    "tools": "ИНСТРУМЕНТЫ",
+    "foods": "ПРОДУКТЫ",
+    "emptyOptions": "На вашем сервере не найдено тегов, категорий, инструментов или продуктов."
+  },
+  "cookMode": {
+    "ingredients": "Ингредиенты",
+    "noSteps": "В этом рецепте нет шагов приготовления.",
+    "stepCounter": "Шаг {{current}} из {{total}}",
+    "prev": "‹ Назад",
+    "next": "Далее ›"
+  },
   "connect": {
     "title": "Mealie Go",
     "subtitle": "Подключитесь к своему серверу Mealie",

@@ -1,4 +1,42 @@
 {
+  "common": {
+    "cancel": "منسوخ کریں",
+    "clearAll": "سب صاف کریں",
+    "apply": "لاگو کریں",
+    "applyWithCount": "لاگو کریں ({{count}})",
+    "createOption": "+ \"{{name}}\" بنائیں",
+    "noMatchesCreateNew": "کوئی مماثلت نہیں — اوپر ایک نیا بنائیں۔",
+    "searchOrTypeNew": "تلاش کریں یا نیا نام ٹائپ کریں…"
+  },
+  "time": {
+    "hrMin": "{{hours}} گھنٹے {{minutes}} منٹ",
+    "hrOnly": "{{hours}} گھنٹہ",
+    "minOnly": "{{minutes}} منٹ",
+    "bucket15": "15 منٹ یا اس سے کم",
+    "bucket30": "30 منٹ یا اس سے کم",
+    "bucket60": "1 گھنٹہ یا اس سے کم",
+    "bucket120": "2 گھنٹے یا اس سے کم",
+    "bucketGeneric": "{{minutes}} منٹ یا اس سے کم",
+    "prepLabel": "تیاری: {{time}}",
+    "cookLabel": "پکانا: {{time}}"
+  },
+  "filterModal": {
+    "title": "ریسیپیز فلٹر کریں",
+    "categories": "زمرے",
+    "prepTime": "تیاری کا وقت",
+    "cookTime": "پکانے کا وقت",
+    "tags": "ٹیگز",
+    "tools": "ٹولز",
+    "foods": "اجزاء",
+    "emptyOptions": "آپ کے سرور پر کوئی ٹیگ، زمرہ، ٹول، یا اجزاء نہیں ملے۔"
+  },
+  "cookMode": {
+    "ingredients": "اجزاء",
+    "noSteps": "اس ریسیپی میں پکانے کے کوئی مراحل نہیں ہیں۔",
+    "stepCounter": "مرحلہ {{current}} از {{total}}",
+    "prev": "‹ پچھلا",
+    "next": "اگلا ›"
+  },
   "connect": {
     "title": "Mealie Go",
     "subtitle": "اپنے Mealie سرور سے جڑیں",

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { colors, radius, spacing, typography } from '../theme';
 import { filterOptionName } from '../hooks/useRecipeFilterOptions';
 import type { FilterOptionSets } from '../hooks/useRecipeFilterOptions';
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export default function ActiveFilterChips({ filters, options, onRemove }: Props) {
+  const { t } = useTranslation();
   const count = filters.tags.length + filters.categories.length + filters.tools.length + filters.foods.length
     + (filters.maxPrepMinutes ? 1 : 0) + (filters.maxCookMinutes ? 1 : 0);
   if (count === 0) return null;
@@ -29,7 +31,7 @@ export default function ActiveFilterChips({ filters, options, onRemove }: Props)
             style={styles.chip}
             onPress={() => onRemove('maxPrepMinutes', '')}
           >
-            <Text style={styles.chipText}>Prep: {timeBucketLabel(filters.maxPrepMinutes)} ✕</Text>
+            <Text style={styles.chipText}>{t('time.prepLabel', { time: timeBucketLabel(filters.maxPrepMinutes) })} ✕</Text>
           </TouchableOpacity>
         ) : null}
         {filters.maxCookMinutes ? (
@@ -37,7 +39,7 @@ export default function ActiveFilterChips({ filters, options, onRemove }: Props)
             style={styles.chip}
             onPress={() => onRemove('maxCookMinutes', '')}
           >
-            <Text style={styles.chipText}>Cook: {timeBucketLabel(filters.maxCookMinutes)} ✕</Text>
+            <Text style={styles.chipText}>{t('time.cookLabel', { time: timeBucketLabel(filters.maxCookMinutes) })} ✕</Text>
           </TouchableOpacity>
         ) : null}
         {KEYS.flatMap(key =>

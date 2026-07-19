@@ -1,4 +1,42 @@
 {
+  "common": {
+    "cancel": "إلغاء",
+    "clearAll": "مسح الكل",
+    "apply": "تطبيق",
+    "applyWithCount": "تطبيق ({{count}})",
+    "createOption": "+ إنشاء «{{name}}»",
+    "noMatchesCreateNew": "لا توجد نتائج مطابقة — أنشئ عنصرًا جديدًا أعلاه.",
+    "searchOrTypeNew": "ابحث أو اكتب اسمًا جديدًا…"
+  },
+  "time": {
+    "hrMin": "{{hours}} س {{minutes}} د",
+    "hrOnly": "{{hours}} س",
+    "minOnly": "{{minutes}} د",
+    "bucket15": "15 دقيقة أو أقل",
+    "bucket30": "30 دقيقة أو أقل",
+    "bucket60": "ساعة واحدة أو أقل",
+    "bucket120": "ساعتان أو أقل",
+    "bucketGeneric": "{{minutes}} دقيقة أو أقل",
+    "prepLabel": "التحضير: {{time}}",
+    "cookLabel": "الطهي: {{time}}"
+  },
+  "filterModal": {
+    "title": "تصفية الوصفات",
+    "categories": "الفئات",
+    "prepTime": "وقت التحضير",
+    "cookTime": "وقت الطهي",
+    "tags": "الوسوم",
+    "tools": "الأدوات",
+    "foods": "المكوّنات",
+    "emptyOptions": "لم يتم العثور على وسوم أو فئات أو أدوات أو مكوّنات على خادمك."
+  },
+  "cookMode": {
+    "ingredients": "المكوّنات",
+    "noSteps": "لا تحتوي هذه الوصفة على خطوات طهي.",
+    "stepCounter": "الخطوة {{current}} من {{total}}",
+    "prev": "‹ السابق",
+    "next": "التالي ›"
+  },
   "connect": {
     "title": "Mealie Go",
     "subtitle": "اتصل بخادم Mealie الخاص بك",

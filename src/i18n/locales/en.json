@@ -1,4 +1,42 @@
 {
+  "common": {
+    "cancel": "Cancel",
+    "clearAll": "Clear all",
+    "apply": "Apply",
+    "applyWithCount": "Apply ({{count}})",
+    "createOption": "+ Create \"{{name}}\"",
+    "noMatchesCreateNew": "No matches — create a new one above.",
+    "searchOrTypeNew": "Search or type a new name…"
+  },
+  "time": {
+    "hrMin": "{{hours}} hr {{minutes}} min",
+    "hrOnly": "{{hours}} hr",
+    "minOnly": "{{minutes}} min",
+    "bucket15": "15 min or less",
+    "bucket30": "30 min or less",
+    "bucket60": "1 hour or less",
+    "bucket120": "2 hours or less",
+    "bucketGeneric": "{{minutes}} min or less",
+    "prepLabel": "Prep: {{time}}",
+    "cookLabel": "Cook: {{time}}"
+  },
+  "filterModal": {
+    "title": "Filter Recipes",
+    "categories": "CATEGORIES",
+    "prepTime": "PREP TIME",
+    "cookTime": "COOK TIME",
+    "tags": "TAGS",
+    "tools": "TOOLS",
+    "foods": "FOODS",
+    "emptyOptions": "No tags, categories, tools, or foods found on your server."
+  },
+  "cookMode": {
+    "ingredients": "Ingredients",
+    "noSteps": "This recipe has no steps to cook through.",
+    "stepCounter": "Step {{current}} of {{total}}",
+    "prev": "‹ Prev",
+    "next": "Next ›"
+  },
   "connect": {
     "title": "Mealie Go",
     "subtitle": "Connect to your Mealie server",

@@ -1,4 +1,42 @@
 {
+  "common": {
+    "cancel": "取消",
+    "clearAll": "全部清除",
+    "apply": "应用",
+    "applyWithCount": "应用（{{count}}）",
+    "createOption": "+ 创建“{{name}}”",
+    "noMatchesCreateNew": "没有匹配项——在上方创建一个新的。",
+    "searchOrTypeNew": "搜索或输入新名称…"
+  },
+  "time": {
+    "hrMin": "{{hours}} 小时 {{minutes}} 分钟",
+    "hrOnly": "{{hours}} 小时",
+    "minOnly": "{{minutes}} 分钟",
+    "bucket15": "15 分钟以内",
+    "bucket30": "30 分钟以内",
+    "bucket60": "1 小时以内",
+    "bucket120": "2 小时以内",
+    "bucketGeneric": "{{minutes}} 分钟以内",
+    "prepLabel": "准备：{{time}}",
+    "cookLabel": "烹饪：{{time}}"
+  },
+  "filterModal": {
+    "title": "筛选食谱",
+    "categories": "分类",
+    "prepTime": "准备时间",
+    "cookTime": "烹饪时间",
+    "tags": "标签",
+    "tools": "工具",
+    "foods": "食材",
+    "emptyOptions": "在您的服务器上未找到标签、分类、工具或食材。"
+  },
+  "cookMode": {
+    "ingredients": "食材",
+    "noSteps": "此食谱没有烹饪步骤。",
+    "stepCounter": "第 {{current}} 步，共 {{total}} 步",
+    "prev": "‹ 上一步",
+    "next": "下一步 ›"
+  },
   "connect": {
     "title": "Mealie Go",
     "subtitle": "连接到您的 Mealie 服务器",

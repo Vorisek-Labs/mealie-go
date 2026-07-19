@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useKeepAwake } from 'expo-keep-awake';
+import { useTranslation } from 'react-i18next';
 import { colors, radius, spacing, typography } from '../theme';
 
 interface CookModeStep {
@@ -20,6 +21,7 @@ interface Props {
 // is held for exactly as long as Cook Mode is actually on screen and
 // released the moment it unmounts.
 function CookModeContent({ onClose, recipeName, steps, ingredientLines }: Omit<Props, 'visible'>) {
+  const { t } = useTranslation();
   useKeepAwake();
   const [stepIndex, setStepIndex] = useState(0);
   const [showIngredients, setShowIngredients] = useState(false);
@@ -51,7 +53,7 @@ function CookModeContent({ onClose, recipeName, steps, ingredientLines }: Omit<P
 
       {showIngredients ? (
         <ScrollView style={styles.ingredientsPanel} contentContainerStyle={styles.ingredientsPanelContent}>
-          <Text style={styles.ingredientsPanelTitle}>Ingredients</Text>
+          <Text style={styles.ingredientsPanelTitle}>{t('cookMode.ingredients')}</Text>
           {ingredientLines.map((line, i) => (
             <View key={i}>
               {line.title ? <Text style={styles.ingredientSectionTitle}>{line.title}</Text> : null}
@@ -66,11 +68,11 @@ function CookModeContent({ onClose, recipeName, steps, ingredientLines }: Omit<P
 
       {total === 0 ? (
         <View style={styles.centered}>
-          <Text style={styles.emptyText}>This recipe has no steps to cook through.</Text>
+          <Text style={styles.emptyText}>{t('cookMode.noSteps')}</Text>
         </View>
       ) : (
         <>
-          <Text style={styles.stepCounter}>Step {stepIndex + 1} of {total}</Text>
+          <Text style={styles.stepCounter}>{t('cookMode.stepCounter', { current: stepIndex + 1, total })}</Text>
           <ScrollView style={styles.stepScroll} contentContainerStyle={styles.stepScrollContent}>
             {step.title ? <Text style={styles.stepTitle}>{step.title}</Text> : null}
             <Text style={styles.stepText}>{step.text}</Text>
@@ -82,14 +84,14 @@ function CookModeContent({ onClose, recipeName, steps, ingredientLines }: Omit<P
               onPress={goPrev}
               disabled={atStart}
             >
-              <Text style={[styles.navBtnText, atStart && styles.navBtnTextDisabled]}>‹ Prev</Text>
+              <Text style={[styles.navBtnText, atStart && styles.navBtnTextDisabled]}>{t('cookMode.prev')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.navBtn, atEnd && styles.navBtnDisabled]}
               onPress={goNext}
               disabled={atEnd}
             >
-              <Text style={[styles.navBtnText, atEnd && styles.navBtnTextDisabled]}>Next ›</Text>
+              <Text style={[styles.navBtnText, atEnd && styles.navBtnTextDisabled]}>{t('cookMode.next')}</Text>
             </TouchableOpacity>
           </View>
         </>

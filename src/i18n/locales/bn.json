@@ -1,4 +1,42 @@
 {
+  "common": {
+    "cancel": "বাতিল",
+    "clearAll": "সব মুছুন",
+    "apply": "প্রয়োগ করুন",
+    "applyWithCount": "প্রয়োগ করুন ({{count}})",
+    "createOption": "+ \"{{name}}\" তৈরি করুন",
+    "noMatchesCreateNew": "কোনো মিল নেই — উপরে একটি নতুন তৈরি করুন।",
+    "searchOrTypeNew": "খুঁজুন বা নতুন নাম টাইপ করুন…"
+  },
+  "time": {
+    "hrMin": "{{hours}} ঘ. {{minutes}} মি.",
+    "hrOnly": "{{hours}} ঘণ্টা",
+    "minOnly": "{{minutes}} মিনিট",
+    "bucket15": "15 মিনিট বা তার কম",
+    "bucket30": "30 মিনিট বা তার কম",
+    "bucket60": "1 ঘণ্টা বা তার কম",
+    "bucket120": "2 ঘণ্টা বা তার কম",
+    "bucketGeneric": "{{minutes}} মিনিট বা তার কম",
+    "prepLabel": "প্রস্তুতি: {{time}}",
+    "cookLabel": "রান্না: {{time}}"
+  },
+  "filterModal": {
+    "title": "রেসিপি ফিল্টার করুন",
+    "categories": "বিভাগ",
+    "prepTime": "প্রস্তুতির সময়",
+    "cookTime": "রান্নার সময়",
+    "tags": "ট্যাগ",
+    "tools": "টুল",
+    "foods": "উপাদান",
+    "emptyOptions": "আপনার সার্ভারে কোনো ট্যাগ, বিভাগ, টুল, বা উপাদান পাওয়া যায়নি।"
+  },
+  "cookMode": {
+    "ingredients": "উপাদান",
+    "noSteps": "এই রেসিপিতে রান্নার কোনো ধাপ নেই।",
+    "stepCounter": "ধাপ {{current}} এর {{total}}",
+    "prev": "‹ পূর্ববর্তী",
+    "next": "পরবর্তী ›"
+  },
   "connect": {
     "title": "Mealie Go",
     "subtitle": "আপনার Mealie সার্ভারের সাথে সংযোগ করুন",

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { colors, radius, spacing, typography } from '../theme';
 
 interface PickableItem {
@@ -26,6 +27,7 @@ interface Props<T extends PickableItem> {
 export default function FoodOrUnitPicker<T extends PickableItem>({
   visible, title, initialQuery, search, create, onSelect, onClose,
 }: Props<T>) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
@@ -74,7 +76,7 @@ export default function FoodOrUnitPicker<T extends PickableItem>({
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose}>
-            <Text style={styles.cancel}>Cancel</Text>
+            <Text style={styles.cancel}>{t('common.cancel')}</Text>
           </TouchableOpacity>
           <Text style={styles.title}>{title}</Text>
           <View style={{ width: 60 }} />
@@ -84,7 +86,7 @@ export default function FoodOrUnitPicker<T extends PickableItem>({
           style={styles.input}
           value={query}
           onChangeText={setQuery}
-          placeholder="Search or type a new name…"
+          placeholder={t('common.searchOrTypeNew')}
           placeholderTextColor={colors.textDisabled}
           autoFocus
           autoCapitalize="none"
@@ -95,7 +97,7 @@ export default function FoodOrUnitPicker<T extends PickableItem>({
           <TouchableOpacity style={styles.createRow} onPress={handleCreate} disabled={creating}>
             {creating
               ? <ActivityIndicator color={colors.primary} size="small" />
-              : <Text style={styles.createRowText}>+ Create "{query.trim()}"</Text>
+              : <Text style={styles.createRowText}>{t('common.createOption', { name: query.trim() })}</Text>
             }
           </TouchableOpacity>
         )}
@@ -114,7 +116,7 @@ export default function FoodOrUnitPicker<T extends PickableItem>({
               </TouchableOpacity>
             ))}
             {!loading && results.length === 0 && (
-              <Text style={styles.emptyText}>No matches — create a new one above.</Text>
+              <Text style={styles.emptyText}>{t('common.noMatchesCreateNew')}</Text>
             )}
           </ScrollView>
         )}

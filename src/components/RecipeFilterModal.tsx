@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { colors, radius, spacing, typography } from '../theme';
 import { EMPTY_FILTERS } from '../hooks/useRecipes';
 import type { RecipeFilters } from '../hooks/useRecipes';
 import type { FilterOptionSets } from '../hooks/useRecipeFilterOptions';
-import { TIME_BUCKETS } from '../lib/timeEstimate';
+import { getTimeBuckets } from '../lib/timeEstimate';
 import type { RecipeFood } from '../types';
 
 type FilterKey = keyof RecipeFilters;
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export default function RecipeFilterModal({ visible, loading, options, filters, onApply, onClose }: Props) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<RecipeFilters>(filters);
 
   // Re-seed the draft from the live filters each time the modal opens, so a
@@ -63,11 +65,11 @@ export default function RecipeFilterModal({ visible, loading, options, filters, 
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose}>
-            <Text style={styles.cancel}>Cancel</Text>
+            <Text style={styles.cancel}>{t('common.cancel')}</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Filter Recipes</Text>
+          <Text style={styles.title}>{t('filterModal.title')}</Text>
           <TouchableOpacity onPress={clearAll}>
-            <Text style={styles.clear}>Clear all</Text>
+            <Text style={styles.clear}>{t('common.clearAll')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -78,35 +80,35 @@ export default function RecipeFilterModal({ visible, loading, options, filters, 
         ) : (
           <ScrollView contentContainerStyle={styles.scroll}>
             <ChipSection
-              label="CATEGORIES"
+              label={t('filterModal.categories')}
               options={options.categories.map(c => ({ value: c.slug, name: c.name }))}
               selected={draft.categories}
               onToggle={v => toggleDraft('categories', v)}
             />
             <TimeBucketSection
-              label="PREP TIME"
+              label={t('filterModal.prepTime')}
               selected={draft.maxPrepMinutes}
               onSelect={selectPrepBucket}
             />
             <TimeBucketSection
-              label="COOK TIME"
+              label={t('filterModal.cookTime')}
               selected={draft.maxCookMinutes}
               onSelect={selectCookBucket}
             />
             <ChipSection
-              label="TAGS"
-              options={options.tags.map(t => ({ value: t.slug, name: t.name }))}
+              label={t('filterModal.tags')}
+              options={options.tags.map(tag => ({ value: tag.slug, name: tag.name }))}
               selected={draft.tags}
               onToggle={v => toggleDraft('tags', v)}
             />
             <ChipSection
-              label="TOOLS"
-              options={options.tools.map(t => ({ value: t.slug, name: t.name }))}
+              label={t('filterModal.tools')}
+              options={options.tools.map(tool => ({ value: tool.slug, name: tool.name }))}
               selected={draft.tools}
               onToggle={v => toggleDraft('tools', v)}
             />
             <ChipSection
-              label="FOODS"
+              label={t('filterModal.foods')}
               options={options.foods
                 .filter((f): f is RecipeFood & { id: string } => !!f.id)
                 .map(f => ({ value: f.id, name: f.name }))}
@@ -115,14 +117,14 @@ export default function RecipeFilterModal({ visible, loading, options, filters, 
             />
 
             {!loading && !hasAnyOptions && (
-              <Text style={styles.emptyText}>No tags, categories, tools, or foods found on your server.</Text>
+              <Text style={styles.emptyText}>{t('filterModal.emptyOptions')}</Text>
             )}
           </ScrollView>
         )}
 
         <TouchableOpacity style={styles.applyBtn} onPress={applyAndClose}>
           <Text style={styles.applyBtnText}>
-            Apply{draftCount > 0 ? ` (${draftCount})` : ''}
+            {draftCount > 0 ? t('common.applyWithCount', { count: draftCount }) : t('common.apply')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -139,7 +141,7 @@ function TimeBucketSection({ label, selected, onSelect }: {
     <>
       <Text style={styles.sectionLabel}>{label}</Text>
       <View style={styles.chipRow}>
-        {TIME_BUCKETS.map(bucket => {
+        {getTimeBuckets().map(bucket => {
           const active = selected === bucket.value;
           return (
             <TouchableOpacity

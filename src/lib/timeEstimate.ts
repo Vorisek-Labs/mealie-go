@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import type { RecipeSummary } from '../types';
 
 type TimedRecipe = Pick<RecipeSummary, 'totalTime' | 'prepTime' | 'cookTime' | 'performTime'>;
@@ -55,9 +56,9 @@ const ISO_DURATION_RE = /^P(?:\d+D)?T(?:\d+(?:\.\d+)?H)?(?:\d+(?:\.\d+)?M)?(?:\d
 function formatMinutesAsText(totalMinutes: number): string {
   const hours = Math.floor(totalMinutes / 60);
   const mins = Math.round(totalMinutes - hours * 60);
-  if (hours > 0 && mins > 0) return `${hours} hr ${mins} min`;
-  if (hours > 0) return `${hours} hr`;
-  return `${mins} min`;
+  if (hours > 0 && mins > 0) return i18n.t('time.hrMin', { hours, minutes: mins });
+  if (hours > 0) return i18n.t('time.hrOnly', { hours });
+  return i18n.t('time.minOnly', { minutes: mins });
 }
 
 // A recipe-URL import is supposed to convert a scraped ISO 8601 duration
@@ -115,15 +116,20 @@ export interface TimeBucket {
 
 // Labels say "or less" (not "under") since matchesBucket below is
 // inclusive — a recipe at exactly 15 minutes matches the 15-minute bucket.
-export const TIME_BUCKETS: TimeBucket[] = [
-  { value: 15, label: '15 min or less' },
-  { value: 30, label: '30 min or less' },
-  { value: 60, label: '1 hour or less' },
-  { value: 120, label: '2 hours or less' },
-];
+// A function, not a static const, so labels re-resolve to the current
+// language on every call rather than being frozen at module-load time.
+export function getTimeBuckets(): TimeBucket[] {
+  return [
+    { value: 15, label: i18n.t('time.bucket15') },
+    { value: 30, label: i18n.t('time.bucket30') },
+    { value: 60, label: i18n.t('time.bucket60') },
+    { value: 120, label: i18n.t('time.bucket120') },
+  ];
+}
 
 export function timeBucketLabel(maxMinutes: number): string {
-  return TIME_BUCKETS.find(b => b.value === maxMinutes)?.label ?? `${maxMinutes} min or less`;
+  return getTimeBuckets().find(b => b.value === maxMinutes)?.label
+    ?? i18n.t('time.bucketGeneric', { minutes: maxMinutes });
 }
 
 // Recipes with no parseable time are excluded from a bucket rather than

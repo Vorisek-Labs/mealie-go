@@ -1,4 +1,42 @@
 {
+  "common": {
+    "cancel": "Cancelar",
+    "clearAll": "Limpar tudo",
+    "apply": "Aplicar",
+    "applyWithCount": "Aplicar ({{count}})",
+    "createOption": "+ Criar \"{{name}}\"",
+    "noMatchesCreateNew": "Nenhuma correspondência — crie uma nova acima.",
+    "searchOrTypeNew": "Pesquise ou digite um novo nome…"
+  },
+  "time": {
+    "hrMin": "{{hours}} h {{minutes}} min",
+    "hrOnly": "{{hours}} h",
+    "minOnly": "{{minutes}} min",
+    "bucket15": "15 min ou menos",
+    "bucket30": "30 min ou menos",
+    "bucket60": "1 hora ou menos",
+    "bucket120": "2 horas ou menos",
+    "bucketGeneric": "{{minutes}} min ou menos",
+    "prepLabel": "Preparo: {{time}}",
+    "cookLabel": "Cozimento: {{time}}"
+  },
+  "filterModal": {
+    "title": "Filtrar receitas",
+    "categories": "CATEGORIAS",
+    "prepTime": "TEMPO DE PREPARO",
+    "cookTime": "TEMPO DE COZIMENTO",
+    "tags": "TAGS",
+    "tools": "UTENSÍLIOS",
+    "foods": "INGREDIENTES",
+    "emptyOptions": "Nenhuma tag, categoria, utensílio ou ingrediente encontrado no seu servidor."
+  },
+  "cookMode": {
+    "ingredients": "Ingredientes",
+    "noSteps": "Esta receita não tem etapas de preparo.",
+    "stepCounter": "Etapa {{current}} de {{total}}",
+    "prev": "‹ Anterior",
+    "next": "Próximo ›"
+  },
   "connect": {
     "title": "Mealie Go",
     "subtitle": "Conecte-se ao seu servidor Mealie",
