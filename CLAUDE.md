@@ -665,6 +665,35 @@ Architecture removal), Node 24.16.0 already satisfies every version floor throug
 - Confirmed via `aapt2 dump badging` on the built APK: `targetSdkVersion:'36'`,
   `compileSdkVersion='36'`. Bumped to `1.6.1`/versionCode `22`.
 
+**Follow-up (2026-07-22, same day) — confirmed and fixed the `expo/fetch` risk before Ken ever
+installed v1.6.1.** Asked to double-check against Mealie's docs/this app's own API code before
+installing; that review turned up a **real, confirmed regression**, not just a theoretical one:
+this app has three multipart upload call sites (`updateRecipeImage`, `uploadRecipeAsset`,
+`createRecipeFromImages` in `mealieApi.ts`) that all build `FormData` using the classic React
+Native `{ uri, name, type }` object pattern — and multiple independent reports
+([expo/expo#33134](https://github.com/expo/expo/issues/33134)) confirm this exact pattern throws
+`Unsupported FormDataPart implementation` under `expo/fetch` starting SDK 56, which is now this
+app's default global `fetch`. **Fixed by adding a tracked `.env` file at the project root
+containing `EXPO_PUBLIC_USE_RN_FETCH=1`** — this restores React Native's built-in fetch as global
+(what this entire app was always built and tested against), rather than migrating 3 call sites to
+a newer, still-churning `expo-file-system` File-object API with its own reported device-vs-
+simulator inconsistencies in the same GitHub thread. Verified the fix actually took effect two
+ways: (1) `npx expo export --dev` produces a readable (non-Hermes) bundle, and grepping it for
+`useRnFetch` shows `var useRnFetch = true || false;` — confirming Metro's static env-var inlining
+correctly disabled the `installGlobal('fetch', ...)` branch that installs `expo/fetch`; (2) the
+release APK's compiled Hermes bundle still contains `XMLHttpRequest` (RN's fetch is built on top of
+it) and does NOT contain `Unsupported FormDataPart` or `WinterCG` strings. Re-bumped to
+`1.6.2`/versionCode `23` — **this is the version that should actually be installed**, not v1.6.1
+(that GitHub release is still up, but its own release notes already flagged this exact risk as
+unverified — v1.6.2 is the fix for it, don't reuse v1.6.1's APK).
+- **Important**: `.env` is normally gitignored project-wide (see `.gitignore`) since `.env` files
+  usually hold secrets. This project's tracked `.env` is a deliberate, narrow exception — it holds
+  no secret, only this one `EXPO_PUBLIC_*` build flag (which is non-secret by definition; anything
+  `EXPO_PUBLIC_` gets inlined into the public JS bundle regardless). `.gitignore` now excludes
+  `.env.local` instead for any future actual secret, following the common `.env`/`.env.local`
+  convention. Don't re-add `.env` to `.gitignore` without moving this flag somewhere else first, or
+  every future prebuild will silently lose the fetch fix.
+
 **Real, not-yet-verified risk — needs a hands-on device pass before this is truly done:**
 Starting with SDK 54/55, **Android edge-to-edge rendering is mandatory and cannot be disabled**
 (the `edgeToEdgeEnabled` config option was removed entirely by SDK 55). This app has **zero**
@@ -680,14 +709,13 @@ too much/too little gap), the fix is migrating those 9 `paddingTop: 56` screens 
 this purpose) instead of a hardcoded constant — don't attempt that migration speculatively without
 first confirming visually that something is actually broken.
 
-**Second not-yet-verified risk**: SDK 56 made `expo/fetch` the default `globalThis.fetch`
-implementation (opt out via `EXPO_PUBLIC_USE_RN_FETCH=1` env var if needed). This app's entire API
-layer (`mealieApi.ts`) is built on `fetch()`, including cleartext `http://` self-hosted servers,
-custom proxy headers (`ProxyHeader[]`), and the redirect-downgrade retry logic
-(`retryOnRedirectDowngrade`/`flipUrlScheme`). None of that has been re-verified against the new
-fetch implementation. If login, proxy headers, or the redirect-retry behavior act strangely after
-this upgrade, this is the first thing to suspect — try the `EXPO_PUBLIC_USE_RN_FETCH=1` opt-out to
-confirm/rule it out before digging further into `mealieApi.ts` itself.
+**Second risk — confirmed and fixed same-day, see the follow-up note above**: SDK 56 made
+`expo/fetch` the default `globalThis.fetch`, which doesn't support this app's multipart upload
+pattern. Fixed via the tracked `.env` (`EXPO_PUBLIC_USE_RN_FETCH=1`), verified two ways (bundle
+inspection). This app's `mealieApi.ts` (cleartext `http://` support, custom proxy headers,
+`retryOnRedirectDowngrade`/`flipUrlScheme`) is now running on the exact same RN fetch it was always
+built against — genuinely lower residual risk here than the edge-to-edge item above, which still
+needs eyes on a real device.
 
 **Not done as part of this upgrade** (deliberately, to keep the change reviewable): no attempt to
 adopt any SDK 55/56 new APIs (new `expo-file-system` task-based API, Expo UI, etc.) — this was a
@@ -808,14 +836,28 @@ before touching Expo/RN versions again.
 - Bumped to `1.6.1`/versionCode `22` — a patch bump, not a feature release; this is a compliance/
   infrastructure change with no new user-facing functionality (aside from the edge-to-edge risk
   below, which is a potential regression to watch for, not a feature).
-- **NEEDS DEVICE TESTING more urgently than the usual disclaimer** — no device was connected this
-  session. Unlike most past "not yet device-tested" releases in this log, this one has two
-  concrete, specific new failure modes to check for, not just generic unexercised-code-path risk:
-  (1) does every screen still look right under the status bar now that edge-to-edge can't be
-  disabled (this app has no `SafeAreaView`/`useSafeAreaInsets` anywhere — all 9 `paddingTop: 56`
-  screens are unverified against forced edge-to-edge), and (2) does login/proxy-headers/cleartext
-  HTTP still work correctly now that `expo/fetch` is the default fetch implementation. Test both
-  specifically, not just "does the app launch."
+
+### Session 2026-07-22 (same day, follow-up) — caught + fixed a real multipart-upload regression before install, v1.6.2
+Before installing v1.6.1, Ken asked to double-check against Mealie's docs/this app's own API code
+first. That review found a **confirmed** issue, not a theoretical one: this app's 3 multipart
+upload call sites (`updateRecipeImage`, `uploadRecipeAsset`, `createRecipeFromImages`) all use the
+classic RN `{ uri, name, type }` FormData pattern, which multiple independent reports
+([expo/expo#33134](https://github.com/expo/expo/issues/33134)) confirm throws `Unsupported
+FormDataPart implementation` under `expo/fetch` (SDK 56+'s new default global fetch) — meaning
+recipe image upload, attachment upload, and AI image-to-recipe creation were all almost certainly
+broken by the v1.6.1 upgrade. See the "Follow-up" note in the Expo SDK Upgrades section above for
+the full fix (tracked `.env` with `EXPO_PUBLIC_USE_RN_FETCH=1`) and the two-part verification
+(bundle inspection confirming the `expo/fetch`-install branch is dead-code-eliminated).
+- Bumped to `1.6.2`/versionCode `23`. **v1.6.1's GitHub release/APK should NOT be installed** —
+  it's still up (honest history), but v1.6.2 is the one to actually use.
+- **NEEDS DEVICE TESTING, but scoped down to one real remaining item**: no device was connected
+  this session. The fetch/multipart-upload risk is now resolved with reasonable confidence (verified
+  at the bundle level, not just "should work"). What's left needing an actual look on a real
+  device is the **edge-to-edge / status-bar layout risk** described in the Expo SDK Upgrades
+  section — this app has no `SafeAreaView`/`useSafeAreaInsets` anywhere, and mandatory edge-to-edge
+  is a genuine layout-paradigm change that only shows up visually, never in `tsc`/`expo-doctor`/the
+  build. Check all 9 `paddingTop: 56` screens for correct spacing under the status bar before
+  calling this upgrade fully done.
 
 ### Session 2026-07-19 (part 7) — translated the recipe edit screen — full app coverage complete, v1.6.0
 Final piece of the "keep going" translation effort that began with v1.3.1's infrastructure-plus-

@@ -11,7 +11,11 @@ npm-debug.*
 web-build/
 android/
 ios/
-.env
+# .env is deliberately NOT ignored — the tracked one only holds
+# EXPO_PUBLIC_USE_RN_FETCH=1 (a non-secret build flag, see Expo SDK
+# Upgrades section in CLAUDE.md), which must ship with every build.
+# If a real secret is ever needed, use .env.local instead (still ignored).
+.env.local
 .claude/settings.local.json
 
 # Not app source — lives in the private mealie-go-private repo instead
