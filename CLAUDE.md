@@ -21,7 +21,7 @@ Play Store package: `com.voriseklabs.mealiego`
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Framework | React Native + Expo (TypeScript) | `blank-typescript` template |
+| Framework | React Native 0.86 + Expo SDK 57 (TypeScript) | `blank-typescript` template; upgraded from SDK 53/RN 0.79 on 2026-07-22 for Google Play's Android 16 (API 36) `targetSdkVersion` requirement — see the Expo SDK Upgrades section below |
 | Navigation | React Navigation v7 | Bottom tabs + nested native stack navigators |
 | Auth / API | Mealie REST API directly | No Supabase — Mealie server IS the backend |
 | Token storage | `expo-secure-store` | Auth JWT encrypted at rest |
@@ -575,7 +575,7 @@ adb -s YOUR_DEVICE_SERIAL install -r app\build\outputs\apk\release\app-release.a
 
 **DO NOT use `npx expo run:android`** — registers phantom emulator-5562.
 **DO NOT run `npx expo prebuild`** unless a new native package was just added.
-When adding a native package, use `npx expo install <pkg>` (picks the SDK-53-compatible version)
+When adding a native package, use `npx expo install <pkg>` (picks the SDK-57-compatible version)
 then `npx expo prebuild --platform android` — this regenerates `android/` from `app.json` +
 `assets/`, including the app icon, so it's safe to re-run after fixing icon assets too.
 
@@ -594,11 +594,106 @@ If login ever starts failing with a generic network error again, check
 `android/app/src/main/AndroidManifest.xml` for `android:usesCleartextTraffic="true"` on the
 `<application>` tag after a prebuild — if it's missing, this is why.
 
+**Gotcha (bit us 2026-07-22, SDK 57 upgrade): `babel.config.js` references `'babel-preset-expo'`
+by name, but a fresh `npm install` may only install it nested inside `node_modules/expo/`, never
+hoisted to the project root — `npm ls babel-preset-expo` will show it present, but Metro's bundler
+still fails with `Cannot find module 'babel-preset-expo'` (buried inside a confusing
+`TypeError: Cannot read properties of undefined (reading 'transformFile')` at the top of the
+stack — the real error is further down under `code: 'MODULE_NOT_FOUND'`). Fix: add
+`babel-preset-expo` as an explicit devDependency (pinned to match the installed `expo` SDK version)
+so npm hoists it to root. If Android bundling ever fails with that `transformFile` error again,
+check this first, and check `npm ls babel-preset-expo` for a nested-only install.**
+
+**Gotcha (bit us 2026-07-22, SDK 57 upgrade): Gradle release builds may OOM during dexing**
+(`:app:mergeExtDexRelease` / `:app:writeReleaseSigningConfigVersions` failing with
+`OutOfMemoryError: Metaspace`) — newer AGP/D8/Kotlin toolchains need more heap than the RN/Expo
+template's default (`-Xmx2048m -XX:MaxMetaspaceSize=512m` in `android/gradle.properties`). Fixed
+via `plugins/withGradleMemory.js` (bumps to `-Xmx4096m -XX:MaxMetaspaceSize=1024m`, using
+`@expo/config-plugins`' `withGradleProperties` mod), registered in `app.json`'s plugins array —
+same "survive `expo prebuild --clean`" reasoning as `withReleaseSigning.js`. If this OOM recurs,
+bump the values in that plugin file, not `android/gradle.properties` directly (any direct edit
+there is wiped on the next prebuild).
+
+**Gotcha (Windows-specific, hit during the SDK 57 upgrade): a freshly-built `app-release.apk` can
+leave `android/app/build/outputs/apk/release/` locked** (`EBUSY: resource busy or locked` on
+`rm -rf android` or `expo prebuild --clean` right after a build) — Windows Defender's real-time
+scan (`MsMpEng.exe`) holds a transient lock on newly-written large binaries. Node's/PowerShell's
+recursive delete can get stuck retrying the same handle; `cmd /c rd /q <path>` (plain Win32
+`RemoveDirectory`) succeeded when both of those didn't, once the directory itself was already
+empty. Not worth "fixing" by adding a Defender exclusion — it self-resolves, just retry the
+delete a few seconds later, or fall back to `cmd /c rd /q` if it's still stuck.
+
 Other commands:
 ```powershell
 npx expo start        # dev server
 npx tsc --noEmit      # type check
 ```
+
+---
+
+## Expo SDK Upgrades
+
+### SDK 53 → 57 (2026-07-22) — Google Play `targetSdkVersion` requirement
+Google Play emailed: apps must target Android 16 (API 36) or newer by **2026-08-30**, or updates
+get blocked. Was on Expo SDK 53 (RN 0.79, target API 35, versionCode 21). Asked Ken whether to
+upgrade to the minimum-compliant SDK 54 or jump straight to latest (SDK 57 at the time); he chose
+**jump to latest**, accepting the larger diff.
+
+**Confirmed non-issues before starting** (checked the actual codebase, not assumed): no
+`react-native-reanimated` usage (SDK 55's Reanimated v4/New-Architecture-only requirement doesn't
+apply), no `@expo/vector-icons` usage (SDK 56's deprecation doesn't apply — this app uses emoji/
+Unicode glyphs for icons throughout), no `expo-router` installed (SDK 56's "expo-router no longer
+depends on react-navigation" breaking change doesn't apply — this app uses React Navigation v7
+directly), New Architecture already enabled (`newArchEnabled=true`, satisfies SDK 55's Legacy
+Architecture removal), Node 24.16.0 already satisfies every version floor through SDK 57.
+
+**What actually changed:**
+- `react-native` 0.79.6 → 0.86.0, `react` 19.0.0 → 19.2.3, `expo` ~53.0.0 → ~57.0.8, TypeScript
+  ~5.8 → ~6.0.3, all `expo-*` packages bumped to their SDK 57 releases.
+- `app.json`'s top-level `splash` key was removed — SDK 57's config schema rejects it
+  (`expo-doctor` catches this: "should NOT have additional property 'splash'"). Migrated to the
+  `expo-splash-screen` config plugin instead (same `image`/`resizeMode`/`backgroundColor` fields,
+  just nested under `plugins`).
+- `metro.config.js` **did not exist** in this project before this upgrade and was needed — SDK 57's
+  Metro tree-shaking serializer (`treeShakeSerializerPlugin.js`) crashes without one. Added the
+  standard `getDefaultConfig(__dirname)` boilerplate.
+- `babel-preset-expo` had to be added as an explicit devDependency (see the Build Commands gotcha
+  above) — previously relied on npm hoisting a transitive copy, which stopped happening on a fresh
+  install under the new dependency graph.
+- Two new custom config plugins: `plugins/withGradleMemory.js` (Gradle Metaspace OOM fix, see
+  Build Commands gotcha above) alongside the pre-existing `plugins/withReleaseSigning.js`.
+- Confirmed via `aapt2 dump badging` on the built APK: `targetSdkVersion:'36'`,
+  `compileSdkVersion='36'`. Bumped to `1.6.1`/versionCode `22`.
+
+**Real, not-yet-verified risk — needs a hands-on device pass before this is truly done:**
+Starting with SDK 54/55, **Android edge-to-edge rendering is mandatory and cannot be disabled**
+(the `edgeToEdgeEnabled` config option was removed entirely by SDK 55). This app has **zero**
+`SafeAreaView`/`useSafeAreaInsets` usage anywhere in `src/` (confirmed via `grep` before starting) —
+every screen instead hardcodes `paddingTop: 56` (9 files) to clear the status bar under the old,
+non-edge-to-edge rendering model. With edge-to-edge now forced on, content may draw under the
+status bar/navigation bar in a way that hardcoded offset doesn't correctly account for on every
+device (different status bar heights, notches, gesture-nav bar insets, etc.). **This did not show
+up in `npx tsc --noEmit`, `expo-doctor`, or the Gradle build — it can only be caught by actually
+looking at the app on a device.** If screens look wrong under the status bar (content clipped,
+too much/too little gap), the fix is migrating those 9 `paddingTop: 56` screens to
+`react-native-safe-area-context`'s `useSafeAreaInsets()` (already a dependency, just unused for
+this purpose) instead of a hardcoded constant — don't attempt that migration speculatively without
+first confirming visually that something is actually broken.
+
+**Second not-yet-verified risk**: SDK 56 made `expo/fetch` the default `globalThis.fetch`
+implementation (opt out via `EXPO_PUBLIC_USE_RN_FETCH=1` env var if needed). This app's entire API
+layer (`mealieApi.ts`) is built on `fetch()`, including cleartext `http://` self-hosted servers,
+custom proxy headers (`ProxyHeader[]`), and the redirect-downgrade retry logic
+(`retryOnRedirectDowngrade`/`flipUrlScheme`). None of that has been re-verified against the new
+fetch implementation. If login, proxy headers, or the redirect-retry behavior act strangely after
+this upgrade, this is the first thing to suspect — try the `EXPO_PUBLIC_USE_RN_FETCH=1` opt-out to
+confirm/rule it out before digging further into `mealieApi.ts` itself.
+
+**Not done as part of this upgrade** (deliberately, to keep the change reviewable): no attempt to
+adopt any SDK 55/56 new APIs (new `expo-file-system` task-based API, Expo UI, etc.) — this was a
+compliance-driven version bump, not a feature upgrade. The existing `expo-file-system` usage (an
+undeclared transitive need of `expo-image-picker`'s camera capture, per the existing Package
+versions note below) was left exactly as-is.
 
 ---
 
@@ -686,7 +781,41 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 ## Current Build Status
 
-**Session (latest) — 2026-07-19**
+**Session (latest) — 2026-07-22**
+
+### Session 2026-07-22 — Expo SDK 53 → 57 upgrade for Google Play API 36 requirement, v1.6.1
+Google Play emailed that the app must target Android 16 (API 36) by 2026-08-30 or updates get
+blocked (was on API 35 via Expo SDK 53). Ken chose to jump straight to the latest SDK (57) rather
+than the minimum-compliant SDK 54, accepting a larger diff. Full detail — what changed, what was
+confirmed as a non-issue before starting, and the two real unverified risks (mandatory Android
+edge-to-edge with zero existing safe-area handling in this app, and SDK 56's `expo/fetch` becoming
+the default fetch implementation) — is in the new **Expo SDK Upgrades** section above; read that
+before touching Expo/RN versions again.
+- Hit and fixed three distinct build-breaking issues along the way, all now documented as Build
+  Commands gotchas: `babel-preset-expo` not hoisting to root (Metro bundling failure disguised as
+  a confusing `transformFile` TypeError), a missing `metro.config.js` (didn't exist before, SDK 57
+  needs one), and a Gradle Metaspace OOM during dexing (fixed persistently via a new
+  `plugins/withGradleMemory.js` config plugin, same pattern as `withReleaseSigning.js`).
+- Also hit a Windows-specific transient file lock (Defender scanning the freshly-built APK) that
+  blocked `rm -rf android` a few times — resolved itself / worked around with `cmd /c rd /q`, not a
+  real bug, documented as a gotcha so it doesn't cause confusion again.
+- `app.json`'s `splash` key migrated to the `expo-splash-screen` config plugin (SDK 57's schema
+  rejects the old top-level key — caught via `expo-doctor`, not just tsc).
+- Confirmed via `aapt2 dump badging` on the actual built APK: `targetSdkVersion:'36'`,
+  `compileSdkVersion='36'` — verified the fix actually did what Google asked, not just "should
+  work." `npx tsc --noEmit` and `npx expo-doctor@latest` (20/20 checks) both clean. Verified release
+  signature unchanged (`CN=Vorisek Labs, OU=Mealie Go`) via `apksigner verify --print-certs`.
+- Bumped to `1.6.1`/versionCode `22` — a patch bump, not a feature release; this is a compliance/
+  infrastructure change with no new user-facing functionality (aside from the edge-to-edge risk
+  below, which is a potential regression to watch for, not a feature).
+- **NEEDS DEVICE TESTING more urgently than the usual disclaimer** — no device was connected this
+  session. Unlike most past "not yet device-tested" releases in this log, this one has two
+  concrete, specific new failure modes to check for, not just generic unexercised-code-path risk:
+  (1) does every screen still look right under the status bar now that edge-to-edge can't be
+  disabled (this app has no `SafeAreaView`/`useSafeAreaInsets` anywhere — all 9 `paddingTop: 56`
+  screens are unverified against forced edge-to-edge), and (2) does login/proxy-headers/cleartext
+  HTTP still work correctly now that `expo/fetch` is the default fetch implementation. Test both
+  specifically, not just "does the app launch."
 
 ### Session 2026-07-19 (part 7) — translated the recipe edit screen — full app coverage complete, v1.6.0
 Final piece of the "keep going" translation effort that began with v1.3.1's infrastructure-plus-
@@ -1355,10 +1484,13 @@ All source files scaffolded and ready for `npm install + prebuild`:
 3. Fix any bugs found during real device testing
 
 ### Package versions pinned (do not change without testing)
-- expo-asset: ~11.1.7 — REQUIRED, omitting it causes `Cannot find native module 'ExpoAsset'` crash on launch
-- react-native: 0.79.6
-- react-native-screens: ~4.11.1
-- react-native-safe-area-context: 5.4.0
+- **As of 2026-07-22 (Expo SDK 53 → 57 upgrade, see Expo SDK Upgrades section above)**:
+  `expo` ~57.0.8, `react-native` 0.86.0, `react` 19.2.3, `react-native-screens` ~4.26.0,
+  `react-native-safe-area-context` ~5.7.0, TypeScript ~6.0.3 — all `expo-*` packages bumped to
+  their SDK 57 releases. `babel-preset-expo` is now an explicit devDependency (previously relied on
+  npm hoisting, which stopped working — see Build Commands gotcha). `metro.config.js` now exists
+  (didn't before) and is required for SDK 57's Metro tree-shaking serializer to work at all.
+- expo-asset — REQUIRED, omitting it causes `Cannot find native module 'ExpoAsset'` crash on launch
 - expo-image-picker, expo-document-picker, expo-print, expo-sharing — added 2026-07-09 for
   photo/attachment upload + PDF export; installed via `npx expo install` (SDK-53-matched versions).
   Run `npx expo install --check` after any `npm install` — see Gotcha in Build Commands, one of
