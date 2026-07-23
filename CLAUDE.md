@@ -694,20 +694,15 @@ unverified — v1.6.2 is the fix for it, don't reuse v1.6.1's APK).
   convention. Don't re-add `.env` to `.gitignore` without moving this flag somewhere else first, or
   every future prebuild will silently lose the fetch fix.
 
-**Real, not-yet-verified risk — needs a hands-on device pass before this is truly done:**
-Starting with SDK 54/55, **Android edge-to-edge rendering is mandatory and cannot be disabled**
-(the `edgeToEdgeEnabled` config option was removed entirely by SDK 55). This app has **zero**
-`SafeAreaView`/`useSafeAreaInsets` usage anywhere in `src/` (confirmed via `grep` before starting) —
-every screen instead hardcodes `paddingTop: 56` (9 files) to clear the status bar under the old,
-non-edge-to-edge rendering model. With edge-to-edge now forced on, content may draw under the
-status bar/navigation bar in a way that hardcoded offset doesn't correctly account for on every
-device (different status bar heights, notches, gesture-nav bar insets, etc.). **This did not show
-up in `npx tsc --noEmit`, `expo-doctor`, or the Gradle build — it can only be caught by actually
-looking at the app on a device.** If screens look wrong under the status bar (content clipped,
-too much/too little gap), the fix is migrating those 9 `paddingTop: 56` screens to
-`react-native-safe-area-context`'s `useSafeAreaInsets()` (already a dependency, just unused for
-this purpose) instead of a hardcoded constant — don't attempt that migration speculatively without
-first confirming visually that something is actually broken.
+**Edge-to-edge risk — confirmed via real device testing 2026-07-22, fixed in v1.6.8 (see the
+dedicated section below for full detail).** Starting with SDK 54/55, Android edge-to-edge
+rendering is mandatory and cannot be disabled. The bottom tab bar was genuinely unreachable behind
+the system nav bar, and the splash screen showed white corners around the rounded icon — both real
+bugs, not just theoretical risk. Root causes and fixes are documented in "Edge-to-edge fallout
+(v1.6.8)" below. The 9 screens using hardcoded `paddingTop: 56` were NOT found to be visibly broken
+on the test device — only the bottom-anchored elements (tab bar + a few absolute-positioned bottom
+buttons) were affected. Don't assume the top-padding screens are fine on every device, but they're
+lower priority than the bottom-anchored pattern now that that's understood.
 
 **Second risk — confirmed and fixed same-day, see the follow-up note above**: SDK 56 made
 `expo/fetch` the default `globalThis.fetch`, which doesn't support this app's multipart upload
@@ -722,6 +717,111 @@ adopt any SDK 55/56 new APIs (new `expo-file-system` task-based API, Expo UI, et
 compliance-driven version bump, not a feature upgrade. The existing `expo-file-system` usage (an
 undeclared transitive need of `expo-image-picker`'s camera capture, per the existing Package
 versions note below) was left exactly as-is.
+
+### Edge-to-edge fallout (v1.6.8) — bottom tab bar + splash screen white corners
+Real device testing (2026-07-22, on `R5CN20KJXDL`) turned up two genuine bugs from the mandatory
+edge-to-edge change above, plus a Windows-specific build-tooling gotcha hit while fixing them.
+
+**Bug 1 — bottom tab bar unreachable behind the system nav bar.** Adding `SafeAreaProvider` at the
+app root (`App.tsx`) did NOT fix this by itself — the real cause was `RootNavigator.tsx`'s
+`MainTabs` `screenOptions.tabBarStyle`, which had a **hardcoded `height: 60, paddingBottom: 8`**.
+React Navigation's Bottom Tabs normally computes its own height automatically from the real bottom
+safe-area inset (true "no additional code needed" under edge-to-edge, confirmed via
+[72technologies' Android 15 edge-to-edge guide](https://www.72technologies.com/blog/android-15-edge-to-edge-react-native-expo))
+— but ANY explicit `height`/`paddingBottom` in `tabBarStyle` completely bypasses that automatic
+sizing. Fixed by importing `useSafeAreaInsets()` in `MainTabs` and using
+`height: 60 + insets.bottom` / `paddingBottom: 8 + insets.bottom`. **The same class of bug existed
+in two other places** — any screen/component with a custom `position: 'absolute', bottom: ...`
+element needs the same treatment; found and fixed `RecipeSuggestionsScreen`'s "Find Recipes" button
+and `RecipeFilterModal`'s "Apply" button (both anchored to the actual screen/modal bottom edge, not
+a small child container) and `ShoppingListDetailScreen`'s add-item bar. Checked every other
+`position: 'absolute'` style in `src/` (via `grep`) — the rest are top-anchored badges/overlays or
+scoped to small card/hero-image containers, not the physical screen bottom, so they didn't need
+this fix. **If a new bottom-anchored custom UI element is ever added, it needs
+`useSafeAreaInsets().bottom` added to its bottom offset/padding — this does NOT happen
+automatically outside of React Navigation's own built-in components.**
+
+Also migrated off `expo-status-bar` (removed as a dependency) to `react-native-edge-to-edge`'s
+`SystemBars` component in `App.tsx`, per
+[Expo's own troubleshooting doc](https://github.com/expo/fyi/blob/main/edge-to-edge-system-bars.md):
+`expo-status-bar`/`expo-navigation-bar` are documented as using deprecated APIs that "may cause
+unexpected behavior" under mandatory edge-to-edge. `react-native-edge-to-edge` is now a direct
+dependency; its config plugin switched the generated native theme from
+`Theme.AppCompat.DayNight.NoActionBar` (with manually-set transparent status/nav bar colors) to
+the library's own `Theme.EdgeToEdge`.
+
+**Bug 2 — splash screen white corners around the rounded icon**, instead of blending into the dark
+background. This took several wrong turns before landing on the real fix — worth reading if this
+regresses, so the same dead ends aren't repeated:
+- First attempt: added `windowSplashScreenIconBackgroundColor` via a new `withAndroidStyles` config
+  plugin. **Didn't work** — turned out multiple plugins registering the same mod type
+  (`withAndroidStyles`) compose in *reverse* of their app.json array order (confirmed by
+  instrumenting both plugins with logging): the new plugin, listed after `expo-splash-screen`, was
+  actually *executing before* it and only saw a partial/intermediate style block, which
+  `expo-splash-screen`'s own plugin then fully rebuilt from scratch (filter-and-replace, not a
+  merge), discarding the addition. **Fix: the plugin must be listed BEFORE `expo-splash-screen` in
+  app.json's `plugins` array** so it actually runs after and sees the final style block.
+- Second attempt (after fixing ordering): still didn't work. Turned out the wrong attribute name
+  was used — `android:windowSplashScreenIconBackgroundColor` (with the `android:` prefix) is the
+  genuine **native Android framework attribute** (API 31+, used by real devices via
+  `android.window.SplashScreen`), while `windowSplashScreenIconBackgroundColor` (no prefix) is a
+  **separate custom attribute** defined by the `androidx.core.splashscreen` **compat** library
+  (confirmed by reading that library's actual `attrs.xml` and its oval `icon_background.xml`
+  drawable directly from the Gradle cache) — used only on its pre-API-31 fallback path. **Both**
+  are now set, since either could be the one that actually matters depending on the device's exact
+  OS version/vendor skin.
+- Third attempt: also added `android:windowBackground` to both `AppTheme` and
+  `Theme.App.SplashScreen`, on the theory that AppCompat's `DayNight` base theme (which
+  `Theme.EdgeToEdge` extends) might show its own light-mode default background briefly during
+  window creation, independent of the splash icon's own background attribute. Real device testing
+  after this attempt still showed white corners, ruling this out as the (sole) cause — kept anyway
+  since it's a legitimate belt-and-suspenders fix, just not the actual bug.
+- **The actual bug**: pixel-inspected the SOURCE `assets/splash.png` directly (via a small Jimp
+  script — devDependency already in this project) and found it had **real, opaque, baked-in white
+  padding** around a smaller rounded-square icon (corner pixels were `{r:254,g:254,b:254,a:255}` —
+  fully opaque white, not transparent). This is why no amount of Android theme-attribute tinkering
+  ever fixed it — the white was baked directly into the source image's pixel data, nothing to do
+  with OS-level background layering at all. **Fixed by replacing `assets/splash.png` with a copy of
+  `assets/icon.png`** (the app's launcher icon — already confirmed correctly full-bleed dark with
+  zero transparency/padding anywhere, per the existing Assets section notes). Also bumped
+  `imageWidth` in the `expo-splash-screen` plugin config from its default (100) to 200 so the icon
+  displays larger. **Residual**: a very faint edge/halo is still visible around the icon on the
+  test device — expo-splash-screen's own generated drawable still pads the source image with a
+  transparent margin inside a larger canvas (confirmed via pixel-inspecting the generated
+  `drawable-xxxhdpi/splashscreen_logo.png`, still `a:0` at its corners) regardless of source image
+  content, and this residual margin is a separate, so-far-unresolved mechanism from anything fixed
+  above. Ken accepted this as good enough for now (2026-07-22) — if it needs full elimination
+  later, the next thing to try is pushing `imageWidth` much closer to the generated canvas's own
+  native size (1152px at xxxhdpi ≈ 288dp) so there's little to no margin left for anything to
+  reveal, or investigating what specifically composites into that margin at OS render time (still
+  not fully identified).
+- `plugins/withSplashIconBackground.js` — the surviving plugin from all of the above, sets 3 style
+  items (both icon-background attribute variants + `android:windowBackground` on the splash theme)
+  plus `android:windowBackground` on `AppTheme`. Must stay listed **before** `expo-splash-screen` in
+  app.json's plugins array (see ordering gotcha above) — if it stops applying, check that first.
+
+**New Build Commands gotcha hit while fixing the above**: a stuck
+`android/app/build/outputs/apk/release/` directory (Windows file-lock, same class of issue as the
+Defender-scan gotcha already documented, but this one didn't self-resolve even after 5+ minutes of
+retries, closing all Explorer windows, and multiple different removal techniques — `rm -rf`,
+`cmd /c rd /q`, PowerShell `Remove-Item`, and even a `robocopy /MIR` mirror-empty-folder trick all
+failed specifically on removing the *directory itself*, even though its *contents* were freely
+readable/writable/deletable the whole time — a strong sign of a lingering open directory handle
+from some background process, not an actively-scanning-a-file lock). **Workaround used**: copied
+the project's source files (`src/`, `assets/`, `plugins/`, `App.tsx`, `app.json`, `package.json`,
+`package-lock.json`, `babel.config.js`, `metro.config.js`, `tsconfig.json`, `.env` — NOT
+`node_modules`/`.git`/`android`) to a **short, drive-root-level path** (e.g. `C:/mgo-build`, not a
+deeply-nested temp/scratchpad path — the first attempt at this workaround used the session's own
+scratchpad directory and failed differently, with CMake/ninja errors about object file paths
+exceeding Windows' 250-character limit, since React Native's native C++ modules need short build
+paths on Windows), ran `npm install` + `expo prebuild --clean` + the Gradle build fresh there
+(fully unaffected by whatever was locked in the real project directory), then copied the resulting
+`app-release.apk`/`app-release.aab` back into the real project's conventional output paths for
+consistency. **If this exact stuck-directory symptom recurs**: try the normal Defender-wait-and-retry
+approach first (see the existing gotcha above); if that doesn't resolve it within a couple of
+minutes, don't keep burning time on removal techniques — go straight to the scratch-copy-at-a-short-path
+workaround. A full reboot would very likely also clear it, but wasn't tried since the workaround
+avoided needing to interrupt the user's other work.
 
 ---
 
@@ -810,6 +910,45 @@ At the end of every session, commit all changes AND update the Current Build Sta
 ## Current Build Status
 
 **Session (latest) — 2026-07-22**
+
+### Session 2026-07-22 (part 4) — fixed real device-testing bugs from the SDK 57 upgrade, v1.6.8
+Ken tested v1.6.1 directly on his phone (installed live via `adb install` mid-session — the phone
+was plugged in and this was done in-conversation, not deferred to "needs device testing" for once).
+Found two real, concrete bugs from the mandatory edge-to-edge change, not just theoretical risk:
+the bottom tab bar was unreachable behind the system nav bar, and the splash screen showed white
+corners around the rounded logo instead of blending into the dark background. Both are now fixed
+in v1.6.8 — full technical detail, including two earlier wrong-turn fix attempts for the splash
+issue and exactly why each one didn't work, is in the new "Edge-to-edge fallout (v1.6.8)"
+subsection under Expo SDK Upgrades above; read that before touching splash/edge-to-edge config
+again, since it saves re-discovering the same dead ends.
+- Root cause of the tab bar bug: a hardcoded `tabBarStyle.height`/`paddingBottom` in
+  `RootNavigator.tsx` that bypassed React Navigation's own automatic safe-area-aware sizing —
+  `SafeAreaProvider` alone (added earlier in this session) wasn't sufficient, which is why the bug
+  persisted through an earlier fix attempt.
+- Root cause of the splash bug: the SOURCE `assets/splash.png` asset itself had real, opaque white
+  padding baked around a smaller icon (confirmed via direct pixel inspection with Jimp) — nothing to
+  do with Android theme configuration at all, despite two earlier attempts at exactly that.
+  Replaced with a copy of `assets/icon.png` (already confirmed full-bleed dark, zero transparency).
+  A faint residual edge/halo remains (a separate, unidentified mechanism — expo-splash-screen's own
+  generated drawable still pads with transparent margin regardless of source image) — Ken accepted
+  this as good enough for now rather than continuing to chase it same-session.
+- Hit a genuinely stuck Windows file lock on `android/app/build/outputs/apk/release/` that didn't
+  resolve even after 5+ minutes of retries and closing all Explorer windows — worse than the
+  already-documented Defender-scan gotcha. Worked around by building in a fresh scratch copy of the
+  project at a short, drive-root path (`C:/mgo-build` — NOT the session's own deeply-nested
+  scratchpad path, which failed differently via Windows' 250-character path limit breaking the
+  native C++ build), then copying the resulting APK/AAB back into the real project's conventional
+  output paths. The real project's `android/` directory itself is still in a partially-cleared
+  state as of this writing — harmless since it's gitignored/regenerated by prebuild, but a future
+  `expo prebuild --clean` there may hit the same stuck-directory error again until a reboot clears
+  whatever process is holding the handle.
+- All fixes verified via direct `adb install` to Ken's connected phone + logcat crash check
+  (clean launch, no FATAL exceptions) each iteration, not just build-success — this is the first
+  session-in-progress live device testing pass for any of the SDK 57 upgrade work.
+- Bumped through `1.6.2` (expo/fetch multipart fix, same day) up to `1.6.8` across this debugging
+  session; see git tags for the intermediate versions if bisecting is ever needed. v1.6.1 through
+  v1.6.7's GitHub releases are still up for history but should not be installed — v1.6.8 is the one
+  to use.
 
 ### Session 2026-07-22 — Expo SDK 53 → 57 upgrade for Google Play API 36 requirement, v1.6.1
 Google Play emailed that the app must target Android 16 (API 36) by 2026-08-30 or updates get
