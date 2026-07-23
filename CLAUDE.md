@@ -741,6 +741,17 @@ this fix. **If a new bottom-anchored custom UI element is ever added, it needs
 `useSafeAreaInsets().bottom` added to its bottom offset/padding — this does NOT happen
 automatically outside of React Navigation's own built-in components.**
 
+**Follow-up (v1.6.9)**: the same bug class also shows up WITHOUT `position: 'absolute'` at all —
+a plain flex-column footer that's simply the last child in a `flex: 1` `Modal` container ends up
+flush against the physical screen bottom under edge-to-edge just the same, since normal flex layout
+has no concept of safe areas either. Found and fixed three more instances this way: `CookModeModal`'s
+Prev/Next `navBar` (reported directly by Ken after using Cook Mode on-device — buttons were still
+tappable, just visually cramped against the system nav bar), `IngredientParseReviewModal`'s save
+button, and `OidcLoginModal`'s manual sign-in-check button. When auditing for this bug class,
+`position: 'absolute'` is NOT a reliable filter by itself — also check every `<Modal>` usage for a
+trailing action button/bar that's the last element before the modal closes, regardless of how it's
+positioned.
+
 Also migrated off `expo-status-bar` (removed as a dependency) to `react-native-edge-to-edge`'s
 `SystemBars` component in `App.tsx`, per
 [Expo's own troubleshooting doc](https://github.com/expo/fyi/blob/main/edge-to-edge-system-bars.md):
