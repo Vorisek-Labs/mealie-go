@@ -6,6 +6,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShoppingListDetail } from '../hooks/useShoppingLists';
 import { api } from '../lib/mealieApi';
 import { findPossibleMatchIds } from '../lib/shoppingMatch';
@@ -38,6 +39,7 @@ type GroupedSection = { label: { id: string; name: string; color?: string } | nu
 
 export default function ShoppingListDetailScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const { listId, listName } = route.params;
   const {
     list, labels, loading, error, refresh,
@@ -313,7 +315,7 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
         </ScrollView>
       )}
 
-      <View style={styles.addBar}>
+      <View style={[styles.addBar, { paddingBottom: spacing.sm + insets.bottom }]}>
         <TextInput
           style={styles.addQtyInput}
           placeholder={t('shopping.qtyPlaceholder')}

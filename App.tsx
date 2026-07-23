@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import { useEffect, useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
+import { SystemBars } from 'react-native-edge-to-edge';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
 import { FavoritesProvider } from './src/context/FavoritesContext';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -26,11 +27,13 @@ export default function App() {
   if (!i18nReady) return null;
 
   return (
-    <AuthProvider>
-      <FavoritesProvider>
-        <StatusBar style="light" />
-        <RootNavigator />
-      </FavoritesProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <FavoritesProvider>
+          <SystemBars style={{ statusBar: 'light', navigationBar: 'light' }} />
+          <RootNavigator />
+        </FavoritesProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

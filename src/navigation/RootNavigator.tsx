@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { getHasSeenWelcome } from '../lib/onboarding';
 import { colors } from '../theme';
@@ -117,6 +118,7 @@ function CookbooksNavigator() {
 }
 
 function MainTabs() {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -125,8 +127,16 @@ function MainTabs() {
           backgroundColor: colors.tabBar,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
+          // Fixed height + paddingBottom used to be safe pre-edge-to-edge
+          // (Android always reserved space for the system nav bar outside
+          // the app's drawable area). Now that edge-to-edge is mandatory
+          // (Expo SDK 54+), content draws under the system bar, so a fixed
+          // height positioned the tab bar's bottom row of icons/labels
+          // right under (and partly behind) the gesture/button nav bar.
+          // Adding the real bottom inset restores a fixed 60px usable tap
+          // area above the system bar, whatever its actual height is.
+          height: 60 + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
         },
         tabBarActiveTintColor: colors.tabBarActive,
         tabBarInactiveTintColor: colors.tabBarInactive,

@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/mealieApi';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
@@ -65,6 +66,7 @@ function Picker({
 
 export default function RecipeSuggestionsScreen({ navigation }: Props) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [foods, setFoods] = useState<RecipeFood[]>([]);
   const [tools, setTools] = useState<RecipeTool[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(true);
@@ -199,7 +201,11 @@ export default function RecipeSuggestionsScreen({ navigation }: Props) {
             />
           </ScrollView>
           <TouchableOpacity
-            style={[styles.findBtn, (selectionCount === 0 || searching) && { opacity: 0.5 }]}
+            style={[
+              styles.findBtn,
+              { bottom: spacing.lg + insets.bottom },
+              (selectionCount === 0 || searching) && { opacity: 0.5 },
+            ]}
             onPress={handleFindRecipes}
             disabled={selectionCount === 0 || searching}
           >

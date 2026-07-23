@@ -3,6 +3,7 @@ import {
   ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '../theme';
 import { EMPTY_FILTERS } from '../hooks/useRecipes';
 import type { RecipeFilters } from '../hooks/useRecipes';
@@ -23,6 +24,7 @@ interface Props {
 
 export default function RecipeFilterModal({ visible, loading, options, filters, onApply, onClose }: Props) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<RecipeFilters>(filters);
 
   // Re-seed the draft from the live filters each time the modal opens, so a
@@ -122,7 +124,7 @@ export default function RecipeFilterModal({ visible, loading, options, filters, 
           </ScrollView>
         )}
 
-        <TouchableOpacity style={styles.applyBtn} onPress={applyAndClose}>
+        <TouchableOpacity style={[styles.applyBtn, { bottom: spacing.xl + insets.bottom }]} onPress={applyAndClose}>
           <Text style={styles.applyBtnText}>
             {draftCount > 0 ? t('common.applyWithCount', { count: draftCount }) : t('common.apply')}
           </Text>
