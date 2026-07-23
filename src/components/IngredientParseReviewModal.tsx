@@ -3,6 +3,7 @@ import {
   ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/mealieApi';
 import { colors, radius, spacing, typography } from '../theme';
 import FoodOrUnitPicker from './FoodOrUnitPicker';
@@ -48,6 +49,7 @@ type PickerField = 'food' | 'unit';
 // same end result as Mealie's drag-to-reorder step.
 export default function IngredientParseReviewModal({ visible, ingredientLines, onCancel, onComplete }: Props) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>('loading');
   const [errorMsg, setErrorMsg] = useState('');
   const [parsed, setParsed] = useState<ParsedIngredient[]>([]);
@@ -272,7 +274,7 @@ export default function IngredientParseReviewModal({ visible, ingredientLines, o
                 </View>
               ))}
             </ScrollView>
-            <TouchableOpacity style={styles.saveBtn} onPress={() => onComplete(resolved)}>
+            <TouchableOpacity style={[styles.saveBtn, { marginBottom: spacing.md + insets.bottom }]} onPress={() => onComplete(resolved)}>
               <Text style={styles.saveBtnText}>{t('ingredientReview.saveButton', { count: resolved.length })}</Text>
             </TouchableOpacity>
           </>

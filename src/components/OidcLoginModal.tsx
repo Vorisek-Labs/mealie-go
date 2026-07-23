@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OIDC_LOGIN_PATH } from '../lib/mealieApi';
 import type { ProxyHeader } from '../lib/mealieApi';
 import { colors, radius, spacing, typography } from '../theme';
@@ -99,6 +100,7 @@ true;
 
 export default function OidcLoginModal({ serverUrl, proxyHeaders, providerName, onSuccess, onCancel }: Props) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const doneRef = useRef(false);
   const webViewRef = useRef<WebView>(null);
@@ -194,7 +196,7 @@ export default function OidcLoginModal({ serverUrl, proxyHeaders, providerName, 
         {/* Manual fallback -- if the automatic detection above misses for
             any reason, this forces an immediate server-side session check
             instead of leaving the user stuck after they've signed in. */}
-        <TouchableOpacity style={styles.manualCheckButton} onPress={handleManualCheck}>
+        <TouchableOpacity style={[styles.manualCheckButton, { marginBottom: spacing.md + insets.bottom }]} onPress={handleManualCheck}>
           <Text style={styles.manualCheckText}>{t('oidc.manualContinue')}</Text>
         </TouchableOpacity>
       </View>

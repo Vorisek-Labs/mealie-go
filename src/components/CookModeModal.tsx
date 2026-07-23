@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '../theme';
 
 interface CookModeStep {
@@ -22,6 +23,7 @@ interface Props {
 // released the moment it unmounts.
 function CookModeContent({ onClose, recipeName, steps, ingredientLines }: Omit<Props, 'visible'>) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   useKeepAwake();
   const [stepIndex, setStepIndex] = useState(0);
   const [showIngredients, setShowIngredients] = useState(false);
@@ -78,7 +80,7 @@ function CookModeContent({ onClose, recipeName, steps, ingredientLines }: Omit<P
             <Text style={styles.stepText}>{step.text}</Text>
           </ScrollView>
 
-          <View style={styles.navBar}>
+          <View style={[styles.navBar, { paddingBottom: spacing.md + insets.bottom }]}>
             <TouchableOpacity
               style={[styles.navBtn, atStart && styles.navBtnDisabled]}
               onPress={goPrev}

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Mealie Go",
     "slug": "mealie-go",
-    "version": "1.6.8",
+    "version": "1.6.9",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -19,7 +19,7 @@
         "backgroundColor": "#0F0D0A"
       },
       "package": "com.voriseklabs.mealiego",
-      "versionCode": 29,
+      "versionCode": 30,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW"
