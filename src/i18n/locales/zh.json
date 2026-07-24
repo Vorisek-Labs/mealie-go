@@ -99,7 +99,15 @@
     "findRecipesWithCount": "查找食谱（已选 {{count}} 项）"
   },
   "mealPlan": {
-    "days": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
+    "days": [
+      "周一",
+      "周二",
+      "周三",
+      "周四",
+      "周五",
+      "周六",
+      "周日"
+    ],
     "mealTypes": {
       "breakfast": "早餐",
       "lunch": "午餐",
@@ -170,7 +178,20 @@
     "noRecipesFound": "未找到食谱",
     "searchToAddIngredients": "搜索食谱以添加其食材",
     "addRecipesButton": "添加食谱",
-    "addRecipesButtonWithCount_other": "添加 {{count}} 个食谱"
+    "addRecipesButtonWithCount_other": "添加 {{count}} 个食谱",
+    "recipesOnListTitle": "食谱：",
+    "removeRecipeTitle": "移除食谱",
+    "removeRecipeMsg": "从此清单中移除\"{{name}}\"及其食材？",
+    "genericRemoveRecipeError": "无法从此清单中移除食谱",
+    "clearRecipeFilter": "显示所有项目",
+    "recipeFilterEmptyTitle": "没有与此食谱相关的项目",
+    "recipeFilterEmptySubtitle": "其食材可能已被勾选或移除",
+    "selectWeeksTitle": "从膳食计划添加",
+    "thisWeekLabel": "本周",
+    "addWeeksButton_other": "添加 {{count}} 周",
+    "addWeeksButtonNone": "选择一周",
+    "mealPlanWeeksAddedMsg_other": "已从您的膳食计划中添加 {{count}} 个食谱的食材。",
+    "mealPlanWeeksEmptyMsg": "所选周内没有计划的食谱。"
   },
   "cookbooks": {
     "title": "食谱集",

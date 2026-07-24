@@ -12,7 +12,7 @@ import { api } from '../lib/mealieApi';
 import { findPossibleMatchIds } from '../lib/shoppingMatch';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
-import type { RecipeSummary, ShoppingListItem } from '../types';
+import type { RecipeSummary, ShoppingListItem, ShoppingListRecipeRef } from '../types';
 import type { ShoppingStackParams } from '../navigation/RootNavigator';
 
 type Props = {
@@ -38,19 +38,24 @@ function isoDate(date: Date): string {
 type GroupedSection = { label: { id: string; name: string; color?: string } | null; items: ShoppingListItem[] };
 
 export default function ShoppingListDetailScreen({ navigation, route }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const { listId, listName } = route.params;
   const {
     list, labels, loading, error, refresh,
     addItem, toggleItem, deleteItem,
-    generateFromMealPlan, addRecipes, mergeDuplicates, duplicateCount,
+    addFromMealPlanWeeks, addRecipes, removeRecipe, mergeDuplicates, duplicateCount,
   } = useShoppingListDetail(listId);
 
   const [newItem, setNewItem] = useState('');
   const [newQty, setNewQty] = useState('');
   const [adding, setAdding] = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [activeRecipeFilter, setActiveRecipeFilter] = useState<string | null>(null);
+  const [removingRecipeId, setRemovingRecipeId] = useState<string | null>(null);
+
+  const [showWeekPicker, setShowWeekPicker] = useState(false);
+  const [selectedWeeks, setSelectedWeeks] = useState<Set<string>>(new Set());
+  const [addingWeeks, setAddingWeeks] = useState(false);
 
   const [showAddRecipes, setShowAddRecipes] = useState(false);
   const [recipeSearch, setRecipeSearch] = useState('');
@@ -87,18 +92,57 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
     );
   };
 
-  const handleGenerateFromMealPlan = async () => {
-    const now = new Date();
-    const start = mondayOfWeek(now);
-    const end = addDays(start, 6);
-    setGenerating(true);
+  // Weeks offered in the picker: 6 back (in case a list is being built after
+  // the fact / to catch up on unshopped weeks) through 6 forward (meal-prepping
+  // ahead) relative to the current week. Mealie's own meal-plan endpoint takes
+  // an arbitrary start/end range server-side (confirmed — not a "this week
+  // only" server limitation), so this is purely a client-side UI choice.
+  const currentWeekStart = useMemo(() => mondayOfWeek(new Date()), []);
+  const weekOptions = useMemo(() => {
+    const options: { key: string; start: string; end: string; isCurrent: boolean }[] = [];
+    for (let offset = -6; offset <= 6; offset++) {
+      const start = addDays(currentWeekStart, offset * 7);
+      const end = addDays(start, 6);
+      options.push({ key: isoDate(start), start: isoDate(start), end: isoDate(end), isCurrent: offset === 0 });
+    }
+    return options;
+  }, [currentWeekStart]);
+
+  const formatWeekLabel = (startIso: string, endIso: string) => {
+    const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+    const start = new Date(`${startIso}T00:00:00`).toLocaleDateString(i18n.language, opts);
+    const end = new Date(`${endIso}T00:00:00`).toLocaleDateString(i18n.language, opts);
+    return `${start} – ${end}`;
+  };
+
+  const openWeekPicker = () => {
+    setSelectedWeeks(new Set([isoDate(currentWeekStart)]));
+    setShowWeekPicker(true);
+  };
+
+  const toggleWeekSelected = (key: string) => {
+    setSelectedWeeks(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const handleAddSelectedWeeks = async () => {
+    const weeks = weekOptions.filter(w => selectedWeeks.has(w.key));
+    if (weeks.length === 0) return;
+    setAddingWeeks(true);
     try {
-      await generateFromMealPlan(isoDate(start), isoDate(end));
-      Alert.alert(t('shopping.doneTitle'), t('shopping.mealPlanAddedMsg'));
+      const count = await addFromMealPlanWeeks(weeks.map(w => ({ start: w.start, end: w.end })));
+      setShowWeekPicker(false);
+      Alert.alert(
+        t('shopping.doneTitle'),
+        count > 0 ? t('shopping.mealPlanWeeksAddedMsg', { count }) : t('shopping.mealPlanWeeksEmptyMsg')
+      );
     } catch (e) {
       Alert.alert(t('common.error'), e instanceof Error ? e.message : t('shopping.genericMealPlanError'));
     } finally {
-      setGenerating(false);
+      setAddingWeeks(false);
     }
   };
 
@@ -165,10 +209,42 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
     );
   };
 
-  const unchecked = list?.listItems.filter(i => !i.checked) ?? [];
-  const checked = list?.listItems.filter(i => i.checked) ?? [];
+  const toggleRecipeFilter = (recipeId: string) => {
+    setActiveRecipeFilter(prev => prev === recipeId ? null : recipeId);
+  };
+
+  const handleRemoveRecipe = (ref: ShoppingListRecipeRef) => {
+    Alert.alert(
+      t('shopping.removeRecipeTitle'),
+      t('shopping.removeRecipeMsg', { name: ref.recipe.name }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('shopping.remove'),
+          style: 'destructive',
+          onPress: async () => {
+            setRemovingRecipeId(ref.recipeId);
+            try {
+              if (activeRecipeFilter === ref.recipeId) setActiveRecipeFilter(null);
+              await removeRecipe(ref.recipeId);
+            } catch (e) {
+              Alert.alert(t('common.error'), e instanceof Error ? e.message : t('shopping.genericRemoveRecipeError'));
+            } finally {
+              setRemovingRecipeId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const matchesRecipeFilter = (item: ShoppingListItem) =>
+    !activeRecipeFilter || (item.recipeReferences?.some(r => r.recipeId === activeRecipeFilter) ?? false);
+
+  const unchecked = (list?.listItems.filter(i => !i.checked) ?? []).filter(matchesRecipeFilter);
+  const checked = (list?.listItems.filter(i => i.checked) ?? []).filter(matchesRecipeFilter);
   const total = list?.listItems.length ?? 0;
-  const done = checked.length;
+  const done = (list?.listItems.filter(i => i.checked) ?? []).length;
 
   // Items with no structured food link that might be the same thing as
   // another item, worded differently (Mealie's server already auto-merges
@@ -248,15 +324,8 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
 
       {/* Action bar */}
       <View style={styles.actionBar}>
-        <TouchableOpacity
-          style={[styles.actionBtn, generating && { opacity: 0.6 }]}
-          onPress={handleGenerateFromMealPlan}
-          disabled={generating}
-        >
-          {generating
-            ? <ActivityIndicator color={colors.textInverse} size="small" />
-            : <Text style={styles.actionBtnText}>{t('shopping.fromMealPlan')}</Text>
-          }
+        <TouchableOpacity style={styles.actionBtn} onPress={openWeekPicker}>
+          <Text style={styles.actionBtnText}>{t('shopping.fromMealPlan')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn} onPress={openAddRecipes}>
           <Text style={styles.actionBtnText}>{t('shopping.fromRecipes')}</Text>
@@ -267,6 +336,41 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         )}
       </View>
+
+      {(list?.recipeReferences?.length ?? 0) > 0 && (
+        <View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recipeChipsRow}>
+            <Text style={styles.recipeChipsLabel}>{t('shopping.recipesOnListTitle')}</Text>
+            {list!.recipeReferences!.map(ref => {
+              const active = activeRecipeFilter === ref.recipeId;
+              return (
+                <View key={ref.id} style={[styles.recipeChip, active && styles.recipeChipActive]}>
+                  <TouchableOpacity onPress={() => toggleRecipeFilter(ref.recipeId)}>
+                    <Text style={[styles.recipeChipText, active && styles.recipeChipTextActive]} numberOfLines={1}>
+                      {ref.recipe.name}{ref.recipeQuantity > 1 ? ` ×${ref.recipeQuantity}` : ''}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveRecipe(ref)}
+                    disabled={removingRecipeId === ref.recipeId}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    {removingRecipeId === ref.recipeId
+                      ? <ActivityIndicator color={active ? colors.textInverse : colors.textSecondary} size="small" />
+                      : <Text style={[styles.recipeChipRemove, active && styles.recipeChipTextActive]}>✕</Text>
+                    }
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </ScrollView>
+          {activeRecipeFilter && (
+            <TouchableOpacity onPress={() => setActiveRecipeFilter(null)} style={styles.clearFilterRow}>
+              <Text style={styles.clearFilterText}>{t('shopping.clearRecipeFilter')}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {loading ? (
         <View style={styles.centered}>
@@ -279,6 +383,8 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
         </View>
       ) : total === 0 ? (
         <EmptyState icon="🛒" title={t('shopping.listEmptyTitle')} subtitle={t('shopping.listEmptySubtitle')} />
+      ) : activeRecipeFilter && unchecked.length === 0 && checked.length === 0 ? (
+        <EmptyState icon="🍽" title={t('shopping.recipeFilterEmptyTitle')} subtitle={t('shopping.recipeFilterEmptySubtitle')} />
       ) : (
         <ScrollView contentContainerStyle={styles.list} style={{ flex: 1 }}>
           {hasLabels ? (
@@ -418,6 +524,61 @@ export default function ShoppingListDetailScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </View>
       </Modal>
+
+      <Modal
+        visible={showWeekPicker}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowWeekPicker(false)}
+      >
+        <View style={addRecipesStyles.container}>
+          <View style={addRecipesStyles.header}>
+            <TouchableOpacity onPress={() => setShowWeekPicker(false)}>
+              <Text style={addRecipesStyles.cancel}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+            <Text style={addRecipesStyles.title}>{t('shopping.selectWeeksTitle')}</Text>
+            <View style={{ width: 60 }} />
+          </View>
+
+          <FlatList
+            data={weekOptions}
+            keyExtractor={w => w.key}
+            contentContainerStyle={addRecipesStyles.resultsList}
+            renderItem={({ item }) => {
+              const selected = selectedWeeks.has(item.key);
+              return (
+                <TouchableOpacity
+                  style={addRecipesStyles.resultItem}
+                  onPress={() => toggleWeekSelected(item.key)}
+                >
+                  <View style={[addRecipesStyles.checkbox, selected && addRecipesStyles.checkboxChecked]}>
+                    {selected && <Text style={addRecipesStyles.checkmark}>✓</Text>}
+                  </View>
+                  <Text style={addRecipesStyles.resultName}>
+                    {formatWeekLabel(item.start, item.end)}
+                    {item.isCurrent ? `  ·  ${t('shopping.thisWeekLabel')}` : ''}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+          />
+
+          <TouchableOpacity
+            style={[addRecipesStyles.confirmBtn, (selectedWeeks.size === 0 || addingWeeks) && { opacity: 0.5 }]}
+            onPress={handleAddSelectedWeeks}
+            disabled={selectedWeeks.size === 0 || addingWeeks}
+          >
+            {addingWeeks
+              ? <ActivityIndicator color={colors.textInverse} size="small" />
+              : <Text style={addRecipesStyles.confirmBtnText}>
+                  {selectedWeeks.size > 0
+                    ? t('shopping.addWeeksButton', { count: selectedWeeks.size })
+                    : t('shopping.addWeeksButtonNone')}
+                </Text>
+            }
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -434,6 +595,15 @@ const styles = StyleSheet.create({
   actionBtnText: { fontSize: typography.size.sm, color: colors.textPrimary, fontWeight: typography.weight.medium },
   mergeBtn: { backgroundColor: colors.surfaceElevated, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2, borderWidth: 1, borderColor: colors.warning },
   mergeBtnText: { fontSize: typography.size.sm, color: colors.warning, fontWeight: typography.weight.medium },
+  recipeChipsRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: spacing.xs },
+  recipeChipsLabel: { fontSize: typography.size.xs, color: colors.textDisabled, textTransform: 'uppercase', letterSpacing: 0.5, marginRight: spacing.xs },
+  recipeChip: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.surface, borderRadius: radius.full, paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs, borderWidth: 1, borderColor: colors.border, maxWidth: 220 },
+  recipeChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  recipeChipText: { fontSize: typography.size.sm, color: colors.textPrimary, fontWeight: typography.weight.medium },
+  recipeChipTextActive: { color: colors.textInverse },
+  recipeChipRemove: { fontSize: typography.size.sm, color: colors.textSecondary, fontWeight: typography.weight.bold },
+  clearFilterRow: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  clearFilterText: { fontSize: typography.size.sm, color: colors.primary, fontWeight: typography.weight.medium },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   list: { paddingBottom: 80 },
   labelHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm, backgroundColor: colors.background },

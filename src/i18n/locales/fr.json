@@ -100,7 +100,15 @@
     "findRecipesWithCount": "Trouver des recettes ({{count}} sélectionnés)"
   },
   "mealPlan": {
-    "days": ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"],
+    "days": [
+      "Lun",
+      "Mar",
+      "Mer",
+      "Jeu",
+      "Ven",
+      "Sam",
+      "Dim"
+    ],
     "mealTypes": {
       "breakfast": "Petit-déjeuner",
       "lunch": "Déjeuner",
@@ -175,7 +183,22 @@
     "searchToAddIngredients": "Recherchez des recettes pour ajouter leurs ingrédients",
     "addRecipesButton": "Ajouter une recette",
     "addRecipesButtonWithCount_one": "Ajouter {{count}} recette",
-    "addRecipesButtonWithCount_other": "Ajouter {{count}} recettes"
+    "addRecipesButtonWithCount_other": "Ajouter {{count}} recettes",
+    "recipesOnListTitle": "Recettes :",
+    "removeRecipeTitle": "Retirer la recette",
+    "removeRecipeMsg": "Retirer « {{name}} » et ses ingrédients de cette liste ?",
+    "genericRemoveRecipeError": "Impossible de retirer la recette de cette liste",
+    "clearRecipeFilter": "Afficher tous les articles",
+    "recipeFilterEmptyTitle": "Aucun article pour cette recette",
+    "recipeFilterEmptySubtitle": "Ses ingrédients ont peut-être déjà été cochés ou supprimés",
+    "selectWeeksTitle": "Ajouter depuis le planning des repas",
+    "thisWeekLabel": "Cette semaine",
+    "addWeeksButton_one": "Ajouter {{count}} semaine",
+    "addWeeksButton_other": "Ajouter {{count}} semaines",
+    "addWeeksButtonNone": "Sélectionner une semaine",
+    "mealPlanWeeksAddedMsg_one": "Les ingrédients de {{count}} recette de votre planning des repas ont été ajoutés.",
+    "mealPlanWeeksAddedMsg_other": "Les ingrédients de {{count}} recettes de votre planning des repas ont été ajoutés.",
+    "mealPlanWeeksEmptyMsg": "Aucune recette n’était prévue pour la ou les semaines sélectionnées."
   },
   "cookbooks": {
     "title": "Livres de recettes",

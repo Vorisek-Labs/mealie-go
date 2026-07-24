@@ -100,7 +100,15 @@
     "findRecipesWithCount": "रेसिपी खोजें ({{count}} चयनित)"
   },
   "mealPlan": {
-    "days": ["सोम", "मंगल", "बुध", "गुरु", "शुक्र", "शनि", "रवि"],
+    "days": [
+      "सोम",
+      "मंगल",
+      "बुध",
+      "गुरु",
+      "शुक्र",
+      "शनि",
+      "रवि"
+    ],
     "mealTypes": {
       "breakfast": "नाश्ता",
       "lunch": "दोपहर का भोजन",
@@ -175,7 +183,22 @@
     "searchToAddIngredients": "सामग्री जोड़ने के लिए रेसिपी खोजें",
     "addRecipesButton": "रेसिपी जोड़ें",
     "addRecipesButtonWithCount_one": "{{count}} रेसिपी जोड़ें",
-    "addRecipesButtonWithCount_other": "{{count}} रेसिपी जोड़ें"
+    "addRecipesButtonWithCount_other": "{{count}} रेसिपी जोड़ें",
+    "recipesOnListTitle": "व्यंजन:",
+    "removeRecipeTitle": "व्यंजन हटाएं",
+    "removeRecipeMsg": "\"{{name}}\" और इसकी सामग्री को इस सूची से हटाएं?",
+    "genericRemoveRecipeError": "इस सूची से व्यंजन नहीं हटाया जा सका",
+    "clearRecipeFilter": "सभी आइटम दिखाएं",
+    "recipeFilterEmptyTitle": "इस व्यंजन के लिए कोई आइटम नहीं",
+    "recipeFilterEmptySubtitle": "इसकी सामग्री पहले ही चेक की जा चुकी हो या हटाई जा चुकी हो सकती है",
+    "selectWeeksTitle": "भोजन योजना से जोड़ें",
+    "thisWeekLabel": "इस सप्ताह",
+    "addWeeksButton_one": "{{count}} सप्ताह जोड़ें",
+    "addWeeksButton_other": "{{count}} सप्ताह जोड़ें",
+    "addWeeksButtonNone": "एक सप्ताह चुनें",
+    "mealPlanWeeksAddedMsg_one": "आपकी भोजन योजना से {{count}} व्यंजन की सामग्री जोड़ी गई।",
+    "mealPlanWeeksAddedMsg_other": "आपकी भोजन योजना से {{count}} व्यंजनों की सामग्री जोड़ी गई।",
+    "mealPlanWeeksEmptyMsg": "चुने गए सप्ताह(हों) के लिए कोई व्यंजन योजनाबद्ध नहीं था।"
   },
   "cookbooks": {
     "title": "कुकबुक",

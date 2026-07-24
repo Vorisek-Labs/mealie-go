@@ -100,7 +100,15 @@
     "findRecipesWithCount": "রেসিপি খুঁজুন ({{count}} নির্বাচিত)"
   },
   "mealPlan": {
-    "days": ["সোম", "মঙ্গল", "বুধ", "বৃহঃ", "শুক্র", "শনি", "রবি"],
+    "days": [
+      "সোম",
+      "মঙ্গল",
+      "বুধ",
+      "বৃহঃ",
+      "শুক্র",
+      "শনি",
+      "রবি"
+    ],
     "mealTypes": {
       "breakfast": "সকালের নাস্তা",
       "lunch": "দুপুরের খাবার",
@@ -175,7 +183,22 @@
     "searchToAddIngredients": "উপকরণ যোগ করতে রেসিপি খুঁজুন",
     "addRecipesButton": "রেসিপি যোগ করুন",
     "addRecipesButtonWithCount_one": "{{count}}টি রেসিপি যোগ করুন",
-    "addRecipesButtonWithCount_other": "{{count}}টি রেসিপি যোগ করুন"
+    "addRecipesButtonWithCount_other": "{{count}}টি রেসিপি যোগ করুন",
+    "recipesOnListTitle": "রেসিপি:",
+    "removeRecipeTitle": "রেসিপি সরান",
+    "removeRecipeMsg": "\"{{name}}\" এবং এর উপকরণ এই তালিকা থেকে সরাবেন?",
+    "genericRemoveRecipeError": "এই তালিকা থেকে রেসিপি সরানো যায়নি",
+    "clearRecipeFilter": "সব আইটেম দেখান",
+    "recipeFilterEmptyTitle": "এই রেসিপির জন্য কোনো আইটেম নেই",
+    "recipeFilterEmptySubtitle": "এর উপকরণগুলো ইতিমধ্যে চেক করা বা সরানো হয়ে থাকতে পারে",
+    "selectWeeksTitle": "খাদ্য পরিকল্পনা থেকে যোগ করুন",
+    "thisWeekLabel": "এই সপ্তাহ",
+    "addWeeksButton_one": "{{count}}টি সপ্তাহ যোগ করুন",
+    "addWeeksButton_other": "{{count}}টি সপ্তাহ যোগ করুন",
+    "addWeeksButtonNone": "একটি সপ্তাহ নির্বাচন করুন",
+    "mealPlanWeeksAddedMsg_one": "আপনার খাদ্য পরিকল্পনা থেকে {{count}}টি রেসিপির উপকরণ যোগ করা হয়েছে।",
+    "mealPlanWeeksAddedMsg_other": "আপনার খাদ্য পরিকল্পনা থেকে {{count}}টি রেসিপির উপকরণ যোগ করা হয়েছে।",
+    "mealPlanWeeksEmptyMsg": "নির্বাচিত সপ্তাহ(গুলি)-এর জন্য কোনো রেসিপি পরিকল্পিত ছিল না।"
   },
   "cookbooks": {
     "title": "কুকবুক",

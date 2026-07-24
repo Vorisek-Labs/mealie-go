@@ -100,7 +100,15 @@
     "findRecipesWithCount": "ریسیپیز تلاش کریں ({{count}} منتخب)"
   },
   "mealPlan": {
-    "days": ["پیر", "منگل", "بدھ", "جمعرات", "جمعہ", "ہفتہ", "اتوار"],
+    "days": [
+      "پیر",
+      "منگل",
+      "بدھ",
+      "جمعرات",
+      "جمعہ",
+      "ہفتہ",
+      "اتوار"
+    ],
     "mealTypes": {
       "breakfast": "ناشتہ",
       "lunch": "دوپہر کا کھانا",
@@ -175,7 +183,22 @@
     "searchToAddIngredients": "اجزاء شامل کرنے کے لیے ریسیپیز تلاش کریں",
     "addRecipesButton": "ریسیپی شامل کریں",
     "addRecipesButtonWithCount_one": "{{count}} ریسیپی شامل کریں",
-    "addRecipesButtonWithCount_other": "{{count}} ریسیپیز شامل کریں"
+    "addRecipesButtonWithCount_other": "{{count}} ریسیپیز شامل کریں",
+    "recipesOnListTitle": "ترکیبیں:",
+    "removeRecipeTitle": "ترکیب ہٹائیں",
+    "removeRecipeMsg": "\"{{name}}\" اور اس کے اجزاء اس فہرست سے ہٹائیں؟",
+    "genericRemoveRecipeError": "اس فہرست سے ترکیب ہٹائی نہیں جا سکی",
+    "clearRecipeFilter": "تمام اشیاء دکھائیں",
+    "recipeFilterEmptyTitle": "اس ترکیب کے لیے کوئی شے نہیں",
+    "recipeFilterEmptySubtitle": "اس کے اجزاء پہلے ہی چیک یا ہٹائے جا چکے ہو سکتے ہیں",
+    "selectWeeksTitle": "کھانے کے منصوبے سے شامل کریں",
+    "thisWeekLabel": "اس ہفتے",
+    "addWeeksButton_one": "{{count}} ہفتہ شامل کریں",
+    "addWeeksButton_other": "{{count}} ہفتے شامل کریں",
+    "addWeeksButtonNone": "ایک ہفتہ منتخب کریں",
+    "mealPlanWeeksAddedMsg_one": "آپ کے کھانے کے منصوبے سے {{count}} ترکیب کے اجزاء شامل کر دیے گئے۔",
+    "mealPlanWeeksAddedMsg_other": "آپ کے کھانے کے منصوبے سے {{count}} ترکیبوں کے اجزاء شامل کر دیے گئے۔",
+    "mealPlanWeeksEmptyMsg": "منتخب ہفتے/ہفتوں کے لیے کوئی ترکیب طے شدہ نہیں تھی۔"
   },
   "cookbooks": {
     "title": "کک بکس",

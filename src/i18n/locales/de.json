@@ -83,7 +83,15 @@
     "importedRecipeName": "Importiertes Rezept"
   },
   "mealPlan": {
-    "days": ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"],
+    "days": [
+      "Mo",
+      "Di",
+      "Mi",
+      "Do",
+      "Fr",
+      "Sa",
+      "So"
+    ],
     "mealTypes": {
       "breakfast": "Frühstück",
       "lunch": "Mittagessen",
@@ -175,7 +183,22 @@
     "searchToAddIngredients": "Suche nach Rezepten, um deren Zutaten hinzuzufügen",
     "addRecipesButton": "Rezept hinzufügen",
     "addRecipesButtonWithCount_one": "{{count}} Rezept hinzufügen",
-    "addRecipesButtonWithCount_other": "{{count}} Rezepte hinzufügen"
+    "addRecipesButtonWithCount_other": "{{count}} Rezepte hinzufügen",
+    "recipesOnListTitle": "Rezepte:",
+    "removeRecipeTitle": "Rezept entfernen",
+    "removeRecipeMsg": "\"{{name}}\" und die zugehörigen Zutaten von dieser Liste entfernen?",
+    "genericRemoveRecipeError": "Rezept konnte nicht von dieser Liste entfernt werden",
+    "clearRecipeFilter": "Alle Artikel anzeigen",
+    "recipeFilterEmptyTitle": "Keine Artikel für dieses Rezept",
+    "recipeFilterEmptySubtitle": "Die Zutaten wurden möglicherweise bereits abgehakt oder entfernt",
+    "selectWeeksTitle": "Aus dem Essensplan hinzufügen",
+    "thisWeekLabel": "Diese Woche",
+    "addWeeksButton_one": "{{count}} Woche hinzufügen",
+    "addWeeksButton_other": "{{count}} Wochen hinzufügen",
+    "addWeeksButtonNone": "Woche auswählen",
+    "mealPlanWeeksAddedMsg_one": "Zutaten für {{count}} Rezept aus deinem Essensplan wurden hinzugefügt.",
+    "mealPlanWeeksAddedMsg_other": "Zutaten für {{count}} Rezepte aus deinem Essensplan wurden hinzugefügt.",
+    "mealPlanWeeksEmptyMsg": "Für die ausgewählte(n) Woche(n) waren keine Rezepte geplant."
   },
   "cookbooks": {
     "title": "Kochbücher",

@@ -83,7 +83,15 @@
     "importedRecipeName": "Imported Recipe"
   },
   "mealPlan": {
-    "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    "days": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
     "mealTypes": {
       "breakfast": "Breakfast",
       "lunch": "Lunch",
@@ -158,7 +166,22 @@
     "searchToAddIngredients": "Search for recipes to add their ingredients",
     "addRecipesButton": "Add Recipe",
     "addRecipesButtonWithCount_one": "Add {{count}} Recipe",
-    "addRecipesButtonWithCount_other": "Add {{count}} Recipes"
+    "addRecipesButtonWithCount_other": "Add {{count}} Recipes",
+    "recipesOnListTitle": "Recipes:",
+    "removeRecipeTitle": "Remove recipe",
+    "removeRecipeMsg": "Remove \"{{name}}\" and its ingredients from this list?",
+    "genericRemoveRecipeError": "Could not remove recipe from this list",
+    "clearRecipeFilter": "Show all items",
+    "recipeFilterEmptyTitle": "No items for this recipe",
+    "recipeFilterEmptySubtitle": "Its ingredients may have already been checked off or removed",
+    "selectWeeksTitle": "Add from Meal Plan",
+    "thisWeekLabel": "This week",
+    "addWeeksButton_one": "Add {{count}} Week",
+    "addWeeksButton_other": "Add {{count}} Weeks",
+    "addWeeksButtonNone": "Select a week",
+    "mealPlanWeeksAddedMsg_one": "Added ingredients for {{count}} recipe from your meal plan.",
+    "mealPlanWeeksAddedMsg_other": "Added ingredients for {{count}} recipes from your meal plan.",
+    "mealPlanWeeksEmptyMsg": "No recipes were planned for the selected week(s)."
   },
   "recipeEdit": {
     "genericLoadErrorTitle": "Could not load recipe",

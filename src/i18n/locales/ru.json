@@ -102,7 +102,15 @@
     "findRecipesWithCount": "Найти рецепты (выбрано: {{count}})"
   },
   "mealPlan": {
-    "days": ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"],
+    "days": [
+      "Пн",
+      "Вт",
+      "Ср",
+      "Чт",
+      "Пт",
+      "Сб",
+      "Вс"
+    ],
     "mealTypes": {
       "breakfast": "Завтрак",
       "lunch": "Обед",
@@ -185,7 +193,26 @@
     "addRecipesButtonWithCount_one": "Добавить {{count}} рецепт",
     "addRecipesButtonWithCount_few": "Добавить {{count}} рецепта",
     "addRecipesButtonWithCount_many": "Добавить {{count}} рецептов",
-    "addRecipesButtonWithCount_other": "Добавить {{count}} рецептов"
+    "addRecipesButtonWithCount_other": "Добавить {{count}} рецептов",
+    "recipesOnListTitle": "Рецепты:",
+    "removeRecipeTitle": "Удалить рецепт",
+    "removeRecipeMsg": "Удалить «{{name}}» и его ингредиенты из этого списка?",
+    "genericRemoveRecipeError": "Не удалось удалить рецепт из этого списка",
+    "clearRecipeFilter": "Показать все пункты",
+    "recipeFilterEmptyTitle": "Нет пунктов для этого рецепта",
+    "recipeFilterEmptySubtitle": "Возможно, его ингредиенты уже отмечены или удалены",
+    "selectWeeksTitle": "Добавить из плана питания",
+    "thisWeekLabel": "Эта неделя",
+    "addWeeksButton_one": "Добавить {{count}} неделю",
+    "addWeeksButton_few": "Добавить {{count}} недели",
+    "addWeeksButton_many": "Добавить {{count}} недель",
+    "addWeeksButton_other": "Добавить {{count}} недели",
+    "addWeeksButtonNone": "Выберите неделю",
+    "mealPlanWeeksAddedMsg_one": "Добавлены ингредиенты {{count}} рецепта из вашего плана питания.",
+    "mealPlanWeeksAddedMsg_few": "Добавлены ингредиенты {{count}} рецептов из вашего плана питания.",
+    "mealPlanWeeksAddedMsg_many": "Добавлены ингредиенты {{count}} рецептов из вашего плана питания.",
+    "mealPlanWeeksAddedMsg_other": "Добавлены ингредиенты {{count}} рецепта из вашего плана питания.",
+    "mealPlanWeeksEmptyMsg": "На выбранную неделю (недели) не было запланировано рецептов."
   },
   "cookbooks": {
     "title": "Кулинарные книги",

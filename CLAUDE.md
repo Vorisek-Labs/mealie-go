@@ -278,6 +278,37 @@ Public link format for recipients (Vue SPA route, not an API route):
 | PUT | `/api/households/shopping/items/{id}` | Full item body to update |
 | DELETE | `/api/households/shopping/items/{id}` | |
 | POST | `/api/households/shopping/lists/{id}/recipe` | **Body is a JSON array**, even for one recipe: `[{ recipeId, recipeIncrementQuantity }]`. Omit `recipeIngredients` and the server pulls each recipe's full ingredient list itself. The original code here sent a bare object instead of an array — would have 422'd the first time it was actually exercised; fixed as `api.addRecipesToShoppingList()`. There's also a deprecated singular `/recipe/{recipe_id}` route; don't use it, the bulk one replaces it. |
+| POST | `/api/households/shopping/lists/{id}/recipe/{recipeId}/delete` | Removes/decrements exactly the ingredients that recipe contributed. Body: `{ recipeDecrementQuantity }` (defaults to 1 server-side; the app always sends 1). `api.removeRecipeFromShoppingList()`. **Not** the same shape as the deprecated singular *add* route above — this one has a `/delete` suffix and is the real, non-deprecated removal endpoint. |
+
+**Recipe↔shopping-list association is tracked server-side, confirmed against Mealie's actual schema**
+(`mealie/schema/household/group_shopping_list.py`, v3.21.0) — this isn't a client-side inference:
+- `GET .../lists/{id}` (`ShoppingListOut`) includes `recipeReferences`: one entry per recipe that's
+  been added to the list, each carrying `recipeId`, `recipeQuantity` (times added), and the full
+  `recipe` summary (name/image/slug) — enough to render a "recipes on this list" chip row with zero
+  extra fetches.
+- Each item in `listItems` (`ShoppingListItemOut`) ALSO carries its own `recipeReferences` —
+  per-ingredient-line attribution (an item can have more than one entry if the same ingredient was
+  pulled in by more than one recipe and got merged). This is what makes "filter items by recipe"
+  possible client-side, not just "show which recipes are on the list."
+- Manually-added items (typed in free-form, not from a recipe) simply have an empty/absent
+  `recipeReferences` — they never match any recipe filter, which is the correct behavior.
+- `ShoppingListDetailScreen`'s recipe-chip row (added alongside the above endpoint, same session):
+  tap a chip to filter the ingredient list to just that recipe (both checked and unchecked
+  sections); tap again (or the "show all items" link that appears while filtered) to clear it. Tap
+  the ✕ on a chip to remove that recipe and its ingredients via the endpoint above, with a confirm
+  Alert first. Types: `ShoppingListRecipeRef` (list-level) and `ShoppingListItemRecipeRef`
+  (item-level) in `types/index.ts`.
+
+**"From Meal Plan" now supports arbitrary week selection, not just the current week.** Confirmed
+Mealie's own meal-plan endpoint (`GET /api/households/mealplans?start_date=&end_date=`) already
+takes an arbitrary date range server-side — the "only ever adds this week" behavior was a pure
+client-side limitation (`ShoppingListDetailScreen` hardcoded `mondayOfWeek(now)`/`+6 days`), not a
+server one. Tapping "🗓 From Meal Plan" now opens a week-picker modal (6 weeks back through 6 weeks
+forward from the current week, current week pre-checked, multi-select) instead of immediately
+adding. `useShoppingLists.ts`'s `addFromMealPlanWeeks(weeks)` fetches all selected weeks in
+parallel, unions the distinct recipe ids across them (so a recipe planned in two selected weeks
+isn't added twice), and calls the existing bulk add-recipe endpoint once. Replaces the old
+single-week-only `generateFromMealPlan`.
 
 ### Recipe Suggestions ("What can I make?")
 | Method | Path | Notes |
@@ -920,7 +951,56 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 ## Current Build Status
 
-**Session (latest) — 2026-07-22**
+**Session (latest) — 2026-07-24**
+
+### Session 2026-07-24 — recipe↔shopping-list association + multi-week meal plan import, v1.7.0
+Ken noticed the shopping list showed ingredients with no indication of which recipes/meals
+contributed them, and asked whether Mealie even tracks that association before proposing a
+feature. Researched Mealie's actual schema/routes source (`group_shopping_list.py`,
+`controller_shopping_lists.py`, v3.21.0) rather than guessing — confirmed the association is
+real and server-tracked at both the list level (`recipeReferences` on the list itself) and the
+per-item level (`recipeReferences` on each `ShoppingListItemOut`), plus a genuine non-deprecated
+removal endpoint (`POST .../lists/{id}/recipe/{recipeId}/delete`). Full detail in the new API
+Reference notes under Shopping Lists above.
+- Added a "Recipes on this list" chip row to `ShoppingListDetailScreen`: tap a chip to filter the
+  item list (both checked/unchecked) to just that recipe's ingredients, tap again (or a "show all
+  items" link while filtered) to clear; tap the chip's ✕ to remove that recipe and its ingredients
+  via the new endpoint, with a confirm Alert. New types `ShoppingListRecipeRef`/
+  `ShoppingListItemRecipeRef` in `types/index.ts`, new `api.removeRecipeFromShoppingList()`, new
+  `removeRecipe()` in `useShoppingLists.ts`.
+- Separately, Ken pointed out "From Meal Plan" only ever adds the current week — confirmed
+  Mealie's meal-plan endpoint already takes an arbitrary date range server-side, so this was a
+  pure client-side gap. Replaced the old immediate "add this week" action with a week-picker modal
+  (6 weeks back through 6 weeks forward, multi-select, current week pre-checked); selected weeks'
+  recipes are unioned (no duplicate adds if a recipe spans two selected weeks) and added in one
+  bulk call. `generateFromMealPlan` replaced by `addFromMealPlanWeeks(weeks)` in
+  `useShoppingLists.ts`.
+- All new UI strings added to all 11 locale files (not just English) — matches this project's
+  standing full-coverage requirement, not a "translate later" shortcut.
+- `npx tsc --noEmit` clean throughout.
+- **Hit the recurring Windows stuck-directory bug again** (`android/` wouldn't fully delete via
+  `expo prebuild`, `rm -rf`, or `cmd /c rd /q`) — this time traced one layer further than before:
+  a leftover Gradle daemon + its Kotlin compile daemon + a Gradle worker process (found via
+  `Get-CimInstance Win32_Process` on the suspect `java.exe` PIDs) were holding the lock. Killing
+  those three processes let a plain PowerShell `Remove-Item -Recurse -Force` succeed once (for the
+  first version-bump rebuild), but the SAME lock reappeared on the very next `expo prebuild` a few
+  minutes later even with no obviously-relevant process running — so this still isn't fully
+  root-caused, just: (1) always try killing any `java.exe` running from `.gradle/jdks/...` or
+  Android Studio's `jbr` bin first (`Get-CimInstance Win32_Process -Filter "ProcessId=..."` to
+  confirm what a candidate PID actually is before killing it), and (2) if that doesn't clear it,
+  fall back to the already-documented scratch-build-at-a-short-path workaround (`C:/mgo-build` this
+  time) rather than burning more time on removal attempts. Both the APK and AAB for this release
+  were ultimately built there and copied back into the project's conventional
+  `android/app/build/outputs/...` paths.
+- Verified release signature via `apksigner verify --print-certs` (`jarsigner` gives a false
+  "unsigned" negative on v2/v3-only signatures — always use `apksigner`, already documented but
+  re-confirmed here): `CN=Vorisek Labs, OU=Mealie Go, O=Vorisek Labs, C=US`.
+- Bumped to `1.7.0`/versionCode `31` — a minor bump (not a patch) since this is genuinely new
+  functionality, not a bugfix, matching the project's versioning convention so far.
+- Tested live on Ken's connected device (`R5CN20KJXDL`) via direct `adb install` at each step —
+  clean launch, no FATAL/AndroidRuntime errors in logcat, both new features confirmed working by
+  Ken directly (recipe chips/filter/remove, and the meal-plan week picker) before this release was
+  cut.
 
 ### Session 2026-07-22 (part 4) — fixed real device-testing bugs from the SDK 57 upgrade, v1.6.8
 Ken tested v1.6.1 directly on his phone (installed live via `adb install` mid-session — the phone

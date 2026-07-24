@@ -81,21 +81,34 @@ export function useShoppingListDetail(listId: string) {
     );
   }, []);
 
-  const generateFromMealPlan = useCallback(async (weekStart: string, weekEnd: string) => {
-    const mealPlan = await api.getMealPlans(weekStart, weekEnd);
+  // Mealie's own meal-plan endpoint takes an arbitrary start/end date range
+  // (no "one week at a time" restriction server-side) -- this fetches one or
+  // more such ranges in parallel, unions the distinct recipes across all of
+  // them, and adds each exactly once via the same bulk add-recipe endpoint
+  // used elsewhere, so a recipe planned in two selected weeks isn't added twice.
+  const addFromMealPlanWeeks = useCallback(async (weeks: { start: string; end: string }[]) => {
+    if (weeks.length === 0) return 0;
+    const mealPlans = await Promise.all(weeks.map(w => api.getMealPlans(w.start, w.end)));
     const recipeIds = [...new Set(
-      mealPlan.items
+      mealPlans
+        .flatMap(mp => mp.items)
         .filter(e => e.recipeId)
         .map(e => e.recipeId as string)
     )];
-    if (recipeIds.length === 0) return;
+    if (recipeIds.length === 0) return 0;
     await api.addRecipesToShoppingList(listId, recipeIds);
     await refresh();
+    return recipeIds.length;
   }, [listId, refresh]);
 
   const addRecipes = useCallback(async (recipeIds: string[]) => {
     if (recipeIds.length === 0) return;
     await api.addRecipesToShoppingList(listId, recipeIds);
+    await refresh();
+  }, [listId, refresh]);
+
+  const removeRecipe = useCallback(async (recipeId: string) => {
+    await api.removeRecipeFromShoppingList(listId, recipeId);
     await refresh();
   }, [listId, refresh]);
 
@@ -166,6 +179,6 @@ export function useShoppingListDetail(listId: string) {
   return {
     list, labels, loading, error, refresh,
     addItem, toggleItem, deleteItem,
-    generateFromMealPlan, addRecipes, mergeDuplicates, duplicateCount,
+    addFromMealPlanWeeks, addRecipes, removeRecipe, mergeDuplicates, duplicateCount,
   };
 }

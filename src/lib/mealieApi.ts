@@ -676,6 +676,17 @@ export const api = {
       body: JSON.stringify(recipeIds.map(recipeId => ({ recipeId, recipeIncrementQuantity: 1 }))),
     }),
 
+  // Removes (or decrements, if the recipe was added more than once) exactly
+  // the ingredients this recipe contributed to the list -- confirmed against
+  // Mealie's own route (`POST .../lists/{id}/recipe/{recipe_id}/delete`,
+  // NOT the deprecated singular add route of a similar shape) and its
+  // `ShoppingListRemoveRecipeParams` schema (`recipeDecrementQuantity`).
+  removeRecipeFromShoppingList: (listId: string, recipeId: string, decrementQuantity = 1) =>
+    request<ShoppingListWithItems>(`/api/households/shopping/lists/${listId}/recipe/${recipeId}/delete`, {
+      method: 'POST',
+      body: JSON.stringify({ recipeDecrementQuantity: decrementQuantity }),
+    }),
+
   // "What can I make?" — suggests recipes from foods/tools you have on hand.
   getRecipeSuggestions: (params: { foods?: string[]; tools?: string[]; limit?: number }) => {
     const q = new URLSearchParams();

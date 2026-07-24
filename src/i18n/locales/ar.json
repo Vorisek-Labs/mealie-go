@@ -99,7 +99,15 @@
     "findRecipesWithCount": "البحث عن وصفات ({{count}} محدد)"
   },
   "mealPlan": {
-    "days": ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"],
+    "days": [
+      "الإثنين",
+      "الثلاثاء",
+      "الأربعاء",
+      "الخميس",
+      "الجمعة",
+      "السبت",
+      "الأحد"
+    ],
     "mealTypes": {
       "breakfast": "الإفطار",
       "lunch": "الغداء",
@@ -170,7 +178,20 @@
     "noRecipesFound": "لم يتم العثور على وصفات",
     "searchToAddIngredients": "ابحث عن وصفات لإضافة مكوّناتها",
     "addRecipesButton": "إضافة وصفة",
-    "addRecipesButtonWithCount_other": "إضافة {{count}} وصفة"
+    "addRecipesButtonWithCount_other": "إضافة {{count}} وصفة",
+    "recipesOnListTitle": "الوصفات:",
+    "removeRecipeTitle": "إزالة الوصفة",
+    "removeRecipeMsg": "إزالة \"{{name}}\" ومكوناتها من هذه القائمة؟",
+    "genericRemoveRecipeError": "تعذرت إزالة الوصفة من هذه القائمة",
+    "clearRecipeFilter": "عرض جميع العناصر",
+    "recipeFilterEmptyTitle": "لا توجد عناصر لهذه الوصفة",
+    "recipeFilterEmptySubtitle": "ربما تم بالفعل تحديد مكوناتها أو إزالتها",
+    "selectWeeksTitle": "إضافة من خطة الوجبات",
+    "thisWeekLabel": "هذا الأسبوع",
+    "addWeeksButton_other": "إضافة {{count}} أسبوع",
+    "addWeeksButtonNone": "اختر أسبوعًا",
+    "mealPlanWeeksAddedMsg_other": "تمت إضافة مكونات {{count}} وصفة من خطة وجباتك.",
+    "mealPlanWeeksEmptyMsg": "لم تكن هناك وصفات مخططة للأسبوع (الأسابيع) المحددة."
   },
   "cookbooks": {
     "title": "كتب الطبخ",

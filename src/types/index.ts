@@ -228,8 +228,32 @@ export interface ShoppingList {
   updatedAt?: string;
 }
 
+// Per-recipe entry on a shopping list itself -- "this recipe has been added
+// to this list N times" (ShoppingListRecipeRefOut server-side). Carries the
+// full recipe summary so a chip can show it without a second fetch.
+export interface ShoppingListRecipeRef {
+  id: string;
+  shoppingListId: string;
+  recipeId: string;
+  recipeQuantity: number;
+  recipe: RecipeSummary;
+}
+
 export interface ShoppingListWithItems extends ShoppingList {
   listItems: ShoppingListItem[];
+  recipeReferences?: ShoppingListRecipeRef[];
+}
+
+// Per-ingredient-line recipe attribution (ShoppingListItemRecipeRefOut
+// server-side) -- an item can carry more than one of these if the same
+// ingredient was pulled in by more than one recipe and got merged.
+export interface ShoppingListItemRecipeRef {
+  id: string;
+  shoppingListItemId: string;
+  recipeId: string;
+  recipeQuantity: number;
+  recipeScale?: number;
+  recipeNote?: string;
 }
 
 export interface ShoppingListItem {
@@ -245,6 +269,7 @@ export interface ShoppingListItem {
   display?: string;
   labelId?: string;
   label?: { id: string; name: string; color?: string };
+  recipeReferences?: ShoppingListItemRecipeRef[];
 }
 
 export interface Cookbook {
