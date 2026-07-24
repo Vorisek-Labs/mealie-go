@@ -645,14 +645,54 @@ same "survive `expo prebuild --clean`" reasoning as `withReleaseSigning.js`. If 
 bump the values in that plugin file, not `android/gradle.properties` directly (any direct edit
 there is wiped on the next prebuild).
 
-**Gotcha (Windows-specific, hit during the SDK 57 upgrade): a freshly-built `app-release.apk` can
-leave `android/app/build/outputs/apk/release/` locked** (`EBUSY: resource busy or locked` on
-`rm -rf android` or `expo prebuild --clean` right after a build) — Windows Defender's real-time
-scan (`MsMpEng.exe`) holds a transient lock on newly-written large binaries. Node's/PowerShell's
-recursive delete can get stuck retrying the same handle; `cmd /c rd /q <path>` (plain Win32
-`RemoveDirectory`) succeeded when both of those didn't, once the directory itself was already
-empty. Not worth "fixing" by adding a Defender exclusion — it self-resolves, just retry the
-delete a few seconds later, or fall back to `cmd /c rd /q` if it's still stuck.
+**Gotcha (Windows-specific), ROOT-CAUSED 2026-07-24 — `EBUSY: resource busy or locked, rmdir
+'...\android'` on `expo prebuild`.** This recurred repeatedly during the SDK 57 upgrade and
+every session since, and had only ever been worked around per-incident (scratch-path rebuild at
+`C:/mgo-build`, `cmd /c rd /q`, waiting and retrying) — none of those were the actual fix, they
+just dodged it. Actually root-caused this time using Sysinternals `handle64.exe`
+(`https://live.sysinternals.com/handle64.exe` — not installed by default, download it) to see
+which process literally holds an open handle on the `android` directory:
+
+```powershell
+.\handle64.exe -accepteula -u "C:\path\to\mealiego\android"
+```
+
+**Two confirmed, independent causes, both need clearing before `expo prebuild --platform android`
+(especially `--clean`) will reliably succeed:**
+
+1. **`adb.exe` (the background ADB server, port 5037) holds an open handle directly on `android/`
+   after any `adb install`/`adb logcat`/etc. that touched a file inside it** (e.g. installing
+   `android/app/build/outputs/apk/release/app-release.apk`) — confirmed directly via `handle64`,
+   and it does **not** self-release; it stays open indefinitely until the server is restarted.
+   Fix: `adb kill-server` before prebuild. Cheap — the next `adb` command auto-restarts the server
+   and rediscovers the still-plugged-in device with no need to physically unplug/replug.
+2. **The Gradle daemon (and its Kotlin compile daemon) holds an open handle on `android/` after
+   any Gradle build**, by design — daemons stay warm for hours to speed up the next build.
+   Confirmed via `handle64` + `Get-CimInstance Win32_Process` to identify the exact PIDs. Fix:
+   `./gradlew --stop` before prebuild (releases within a couple seconds — `--stop` returns before
+   the daemon process has fully exited, so a truly instant follow-up delete can still race it; in
+   practice the small delay from restarting adb first is enough of a buffer).
+
+**A third, minor contributor**: a shell whose current working directory is *inside* `android/`
+holds it too (ordinary Windows semantics, nothing exotic) — confirmed by accident while
+diagnosing, from this app's own `cd .../android && ./gradlew ...` command pattern used earlier in
+this file's Build Commands section. These are short-lived and self-clear within seconds once the
+command finishes, but avoid `cd`-ing into `android/` at all when possible (invoke `gradlew` via
+`-p <path>` or a full path from outside instead) so this can't stack with the two real causes
+above and tip a close race into a real failure.
+
+**The reliable pre-prebuild sequence, in order:**
+```powershell
+adb kill-server
+android\gradlew.bat -p android --stop
+npx expo prebuild --platform android
+```
+Windows Defender scanning a freshly-written APK (the original, narrower theory this gotcha used to
+describe) is a real but separate and much smaller phenomenon — it only ever affected a single
+just-written file for a few seconds, never explained a whole-directory lock persisting for
+minutes, and turned out not to be what was actually happening in any of the repeated incidents
+this session. If the sequence above ever stops being sufficient, reach for `handle64.exe` again
+rather than guessing at a new theory — it gives a direct, confirmed answer in seconds.
 
 Other commands:
 ```powershell
@@ -859,11 +899,14 @@ exceeding Windows' 250-character limit, since React Native's native C++ modules 
 paths on Windows), ran `npm install` + `expo prebuild --clean` + the Gradle build fresh there
 (fully unaffected by whatever was locked in the real project directory), then copied the resulting
 `app-release.apk`/`app-release.aab` back into the real project's conventional output paths for
-consistency. **If this exact stuck-directory symptom recurs**: try the normal Defender-wait-and-retry
-approach first (see the existing gotcha above); if that doesn't resolve it within a couple of
-minutes, don't keep burning time on removal techniques — go straight to the scratch-copy-at-a-short-path
-workaround. A full reboot would very likely also clear it, but wasn't tried since the workaround
-avoided needing to interrupt the user's other work.
+consistency. **Update (2026-07-24): this exact symptom is now root-caused, not a mystery** — see
+the rewritten Windows-specific `EBUSY`/stuck-directory gotcha earlier in this Build Commands
+section (`adb.exe` + the Gradle daemon both independently hold a real open handle on `android/`,
+confirmed directly with Sysinternals `handle64.exe`). `adb kill-server` + `./gradlew --stop`
+before `expo prebuild` fixes it directly — the scratch-copy-at-a-short-path workaround described
+here should no longer be needed; only fall back to it if that sequence somehow doesn't clear the
+lock, and if so, re-run `handle64.exe` against the directory rather than assuming it's the same
+cause again.
 
 ---
 
@@ -952,6 +995,37 @@ At the end of every session, commit all changes AND update the Current Build Sta
 ## Current Build Status
 
 **Session (latest) — 2026-07-24**
+
+### Session 2026-07-24 (part 2) — root-caused the recurring `expo prebuild` EBUSY lock
+Ken pushed back on the previous session's "here's another scratch-build workaround" pattern:
+"that's causing things to take too long... we gotta track it down and prevent it from happening
+in the first place. It worked fine for weeks without issues." Fair — every prior session had only
+ever worked around this, never actually found the cause. Downloaded Sysinternals `handle64.exe`
+(not installed by default) and used it directly against the locked `android/` directory instead of
+guessing again, which gave a real, immediate, confirmed answer instead of another theory:
+- **`adb.exe`** (the background ADB server) holds a real open handle directly on `android/` after
+  any `adb install`/`adb logcat`/etc. touches a file inside it, and does not release it on its own.
+  Every session in this recent cluster has been installing/testing builds via `adb` far more
+  tightly interleaved with `expo prebuild` reruns than earlier "weeks without issues" sessions
+  did — explaining why this only started showing up now, not a regression in Expo/Gradle/Windows
+  itself.
+- **The Gradle daemon** (+ its Kotlin compile daemon) independently holds its own open handle on
+  `android/` after any build, by design (daemons stay warm for hours). Confirmed the same way.
+- A minor third contributor: a shell `cd`'d into `android/` holds it too (ordinary Windows
+  semantics) — self-clears within seconds, but avoid `cd`-ing into `android/` at all as cheap
+  insurance against stacking with the two real causes above.
+- Fix, confirmed working end-to-end repeatedly: `adb kill-server` + `./gradlew --stop` (via
+  `-p android`, not `cd`) immediately before `expo prebuild --platform android`. No more scratch-path
+  rebuilds needed going forward — full detail moved into the Build Commands gotcha itself (rewrote
+  it in place rather than leaving the old, now-superseded Windows-Defender-scan theory as the
+  primary explanation; that theory was real for the single-freshly-written-APK-file case but never
+  actually explained the whole-directory lock this session was chasing).
+- Also reverted a speculative `org.gradle.vfs.watch=false` change made mid-investigation, before
+  `handle64` gave a real answer — not needed once the actual causes were confirmed, and would have
+  been a confusing unexplained diff to leave in `plugins/withGradleMemory.js` otherwise.
+- No app code changed this part of the session — purely a tooling/workflow fix, verified by
+  successfully re-running `expo prebuild --platform android` against the real project multiple
+  times in a row with the new sequence, including immediately after a full `assembleRelease`.
 
 ### Session 2026-07-24 — recipe↔shopping-list association + multi-week meal plan import, v1.7.0
 Ken noticed the shopping list showed ingredients with no indication of which recipes/meals
