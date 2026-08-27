@@ -799,6 +799,74 @@ npx tsc --noEmit      # type check
 
 ---
 
+## R8 / code shrinking (enabled 2026-08-26, **NOT yet cleared for release**)
+
+Turned on after Google Play's "App is not optimized" recommendation on the v1.7.0 bundle. Enabled
+through `expo-build-properties` in `app.json` (NOT by editing `android/app/build.gradle`, which
+`expo prebuild` regenerates):
+
+```json
+["expo-build-properties", {"android": {
+  "usesCleartextTraffic": true,
+  "enableMinifyInReleaseBuilds": true,
+  "enableShrinkResourcesInReleaseBuilds": true
+}}]
+```
+
+**Property-name trap — check this first if R8 ever appears to do nothing.** The widely-copied name
+is `enableProguardInReleaseBuilds`, which is **deprecated** in the installed `expo-build-properties`;
+it only aliases the current `enableMinifyInReleaseBuilds` when that one is unset. The generated
+`android/app/build.gradle` reads `android.enableMinifyInReleaseBuilds` from `gradle.properties`, so
+the old name silently no-ops on some combinations. Verify after any prebuild with:
+`grep enableMinifyInReleaseBuilds android/gradle.properties` — it must print `=true`.
+
+**Custom keep rules go in `extraProguardRules`** (an `expo-build-properties` android option), NOT in
+`android/app/proguard-rules.pro` directly — prebuild regenerates that file from the template and
+would wipe them. None are currently needed; the only Java/Kotlin in this project is the generated
+`MainActivity`/`MainApplication`.
+
+**Scope of the risk: R8 only rewrites Java/Kotlin bytecode.** The entire app — every screen, the API
+client, i18n, sorting — is JavaScript in the Hermes bundle and is untouched. Breakage can only come
+from native module registration or reflection, which is why the test list below is all
+native-module-backed features and not app logic.
+
+**Result**: release APK 78 MB → 73 MB (~6%). Modest because most of the APK is native `.so`
+libraries (Hermes, RN core), which R8 doesn't touch. A `mapping.txt` is produced at
+`android/app/build/outputs/mapping/release/` and is bundled into the AAB automatically, so Play
+Console deobfuscates crash reports without a manual upload.
+
+**Reading `usage.txt` (what R8 deleted) — don't panic at the class names.** It listed 275 removed
+classes under `com.facebook.react.*`/`expo.*`, but most are **legacy-architecture** classes
+(`NativeViewHierarchyManager`, `UIViewOperationQueue`, `ShadowNodeRegistry`) that are genuinely dead
+because this app runs the New Architecture (`newArchEnabled=true`). Likewise the `splashscreen`
+entries are `R$attr`/`R$dimen` **integer constants**, not the drawables — R8 strips those because
+they get inlined, and `withSplashIconBackground.js` sets its attributes by name in `styles.xml`,
+resolved at resource-compile time rather than through the R class. `RNCSafeAreaViewManagerDelegate`
+and `ActivityIndicatorViewManagerDelegate` were also removed, which looked alarming but is correct:
+those serve the old Paper path, and both safe-area insets and spinners were confirmed working
+on-device afterwards.
+
+### ⚠ DO NOT UPLOAD v1.8.1 TO PLAY UNTIL THESE PASS
+`app.json` is already bumped to `1.8.1`/versionCode `33` with R8 enabled, and the change is
+committed — but it is **NOT release-verified**. Build success proves nothing here; R8 failures
+surface at runtime as `ClassNotFoundException`/`NoSuchMethodError` when a native module initialises.
+Verified on-device 2026-08-26 (Android 13, `R5CN20KJXDL`):
+- [x] Cold launch, module registration, full recipe list render, auth-headered recipe images
+- [x] Safe-area insets correct (tab bar clear of the system nav bar)
+- [x] Loading spinner / pull-to-refresh (`ActivityIndicator`)
+- [x] Splash screen on cold start
+
+**Still untested — Ken deferred these, do them before any v1.8.1 release:**
+- [ ] **Recipe image upload** (`expo-image-picker` + the multipart `FormData` path) — highest risk;
+      this is the same path that broke in the SDK 57 upgrade
+- [ ] **PDF export** (`expo-print` + `expo-sharing`)
+- [ ] **Attachment upload** (`expo-document-picker`)
+- [ ] **Language switch in Settings** (`expo-localization`)
+
+If one fails, the fix is a targeted `-keep` rule added via `extraProguardRules`; logcat will name
+the stripped class directly. If R8 has to be abandoned, revert the two `app.json` properties — the
+build works fine without them.
+
 ## Expo SDK Upgrades
 
 ### SDK 53 → 57 (2026-07-22) — Google Play `targetSdkVersion` requirement
@@ -1146,6 +1214,36 @@ At the end of every session, commit all changes AND update the Current Build Sta
 ## Current Build Status
 
 **Session (latest) — 2026-08-26**
+
+### Session 2026-08-26 (part 2) — v1.8.0 shipped; R8 enabled but NOT release-verified
+- **v1.8.0 shipped to all three surfaces** per the standing checklist: pushed to `master`, tagged
+  `v1.8.0`, GitHub Release cut with the signed APK, and the AAB uploaded to Play Console by Ken.
+- **Ken's server has 1,402 recipes** (visible in the new match count) — which retroactively confirms
+  the `perPage: -1` fix in part 1 was not theoretical: the old 1000-item cap had been silently
+  hiding **402 recipes** from the favorites-only toggle, the prep/cook-time filters, and the
+  favorites sort on his own library the whole time.
+- **Triaged Play Console's three recommendations** on the v1.7.0 bundle rather than acting on all of
+  them; only one was actually ours to fix:
+  1. *Deprecated edge-to-edge APIs* — **not actionable**. Every frame Google listed is inside RN core
+     (`StatusBarModule`, `WindowUtilKt`) or `react-native-edge-to-edge`. This app has zero
+     `StatusBar` calls of its own (only `SystemBars`, migrated in v1.6.8); RN loads that module's
+     constants at startup regardless. Deprecated ≠ removed, and we're already on RN 0.86. Needs an
+     upstream fix; it will keep appearing on our bundles until then.
+  2. *Orientation restriction* (`android:screenOrientation="portrait"`) — **real but deferred**, and
+     bigger than the one-line change it looks like. Since we target SDK 36, Android 16 **already**
+     ignores this on large screens, so removing it changes nothing there; the actual work is whether
+     the layouts survive landscape, and 9 screens still use a hardcoded `paddingTop: 56` with no
+     landscape testing ever done. Its own pass, with real device testing.
+  3. *Not optimized / enable R8* — **done**, see the new R8 section above.
+- **R8 is enabled and committed, but explicitly NOT cleared for release** — 4 of 8 verification items
+  pass, 4 remain (image upload, PDF export, attachments, language switch). Ken deferred those
+  deliberately ("not doing that tonight"). The checklist lives in the R8 section above; do not upload
+  `1.8.1`/versionCode `33` to Play until it's complete.
+- Also diagnosed the recurring `adb unauthorized` friction properly — see the new gotcha under Play
+  Store Release Signing; the short version is that it was never a revoked authorization, and our own
+  reflexive `adb kill-server` was half the cause.
+
+
 
 ### Session 2026-08-26 — recipe list sorting, v1.8.0
 Ken: the recipes list only ever sorted alphabetically; wanted a sort button with more options
