@@ -30,7 +30,10 @@
     "tags": "标签",
     "tools": "工具",
     "foods": "食材",
-    "emptyOptions": "在您的服务器上未找到标签、分类、工具或食材。"
+    "emptyOptions": "在您的服务器上未找到标签、分类、工具或食材。",
+    "searchPlaceholder": "搜索…",
+    "noMatches": "无匹配项",
+    "showingOf": "显示 {{total}} 项中的前 {{shown}} 项 — 输入以缩小范围"
   },
   "cookMode": {
     "ingredients": "食材",
@@ -50,7 +53,41 @@
     "emptySearchSubtitle": "请尝试调整搜索或筛选条件",
     "emptyTitle": "暂无食谱",
     "emptySubtitle": "点击 + 按钮添加您的第一个食谱",
-    "footerCount_other": "{{count}} 个食谱"
+    "count_other": "{{count}} 个食谱",
+    "sort": {
+      "title": "排序食谱",
+      "hint": "再次点击当前的排序方式可反转顺序。",
+      "name": {
+        "label": "名称",
+        "asc": "A – Z",
+        "desc": "Z – A"
+      },
+      "created": {
+        "label": "添加日期",
+        "asc": "最早优先",
+        "desc": "最新优先"
+      },
+      "updated": {
+        "label": "最近更新",
+        "asc": "最久未更新",
+        "desc": "最近更新优先"
+      },
+      "rating": {
+        "label": "评分",
+        "asc": "评分最低",
+        "desc": "评分最高"
+      },
+      "lastMade": {
+        "label": "上次制作",
+        "asc": "最久之前",
+        "desc": "最近制作"
+      },
+      "favorites": {
+        "label": "收藏",
+        "asc": "收藏排在最后",
+        "desc": "收藏优先"
+      }
+    }
   },
   "addRecipe": {
     "title": "添加食谱",
@@ -440,6 +477,7 @@
       "title": "食谱",
       "tips": [
         "搜索食谱，或点击 ▤ 按分类、标签、工具或食材筛选。",
+        "点击搜索栏下方的 ⇅ 标签可重新排序列表 —— 按名称、添加日期、最近更新、评分、上次制作或收藏优先。再次点击同一选项可反转顺序。",
         "点击食谱上的 ♡ 收藏它——点击列表顶部的 ♡/♥ 按钮只查看收藏。",
         "点击 🎲 跳转到随机食谱。",
         "点击 🥕 打开“我能做什么？”——选择您现有的食材和工具，它会推荐您可以制作的食谱，并标出仍缺少的东西。",

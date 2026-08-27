@@ -225,6 +225,103 @@ and `RecipeEditScreen`, before anything is saved — that usage is fine and was 
 tempted to read `ing.disableAmount` on anything that came from `api.getRecipe()` or
 `api.updateRecipe()`, don't — it will always be `undefined` there.
 
+### List rendering: never render an unbounded option list (filter modal, pickers)
+Found 2026-08-26 when Ken reported the filter button felt laggy and "What Can I Make?" was slow to
+open. Two separate costs, worth keeping straight because the fix for each is different:
+
+**1. Rendering — the dominant cost.** `RecipeFilterModal`'s `ChipSection` rendered EVERY option as
+a real `TouchableOpacity` + `Text` inside a plain `ScrollView` — no cap, no virtualization. **Mealie
+seeds thousands of foods** (its `en-US` food seed file alone is ~538 KB), so the foods section could
+ask React Native to lay out several thousand native views synchronously before the modal could
+appear. This was already bad under the old 1000-item cap and got worse when that cap became
+`perPage: -1` (see below). Fixed with the pattern `RecipeSuggestionsScreen`'s own picker already
+used: a search box plus a hard render cap (`CHIP_RENDER_CAP = 50`), with **selected options always
+rendered** even when the current search text excludes them (otherwise typing looks like it silently
+deselects things), and an explicit "showing first 50 of N" line so a partial list is never passed
+off as the whole list. Sections at or under the cap render as before, with no search box.
+**If you add another option/chip list, cap it — a list that is fine on your server can be thousands
+of entries on someone else's.**
+
+**2. Fetching — cache it for the session.** `useRecipeFilterOptions` cached per *hook instance*, so
+`RecipesScreen` and `CookbookDetailScreen` each refetched the whole set, and
+`RecipeSuggestionsScreen` refetched foods + tools **on every single visit**. These lists describe
+the whole server and barely change. Now cached at module level with an `inFlight` promise so
+concurrent callers share one round trip; the first open in a session pays for it and everything
+afterwards is instant, across all three screens (opening the filter modal now also warms
+"What Can I Make?", and vice versa).
+**`clearRecipeFilterOptionsCache()` MUST be called on logout** — it's wired into `AuthContext.logout`
+alongside `clearCredentials()`. Without it the next account signing into a different server would
+see the previous server's tags, categories, tools and foods. Any future module-level cache of
+server-scoped data needs the same treatment.
+
+### `perPage: -1` — how to fetch a complete list without silently truncating it
+**Mealie interprets `perPage = -1` as "return every match"** — confirmed in
+`mealie/repos/repository_generic.py` (`# interpret -1 as "get_all"`, which sets `per_page` to the
+full row count and drops the SQL `LIMIT`). **No maximum cap is enforced**, and this has been
+present since **v2.0.0**, this app's supported floor. Use it for any "I need the whole list"
+fetch — never a large-looking magic number.
+
+Several places in this app previously used a hardcoded cap for exactly this purpose, and every one
+of them **silently truncated** on a large library — no error, no partial-results indicator, just
+quietly missing data that looked like a working list (found 2026-08-26, after Ken pointed out his
+server could hold well over 1000 recipes):
+- `useRecipes` full-fetch mode (prep/cook-time filters + the favorites sort) capped at 1000, so a
+  favorite or a quick recipe sorting past #1000 alphabetically simply never appeared.
+- `RecipesScreen`'s "favorites only" fetch, same 1000 cap, same consequence.
+- `getTags`/`getCategories`/`getTools` capped at 200 and `getFoods` at 1000 — these populate the
+  filter picker, so options past the cap were just missing from the modal.
+
+All now send `perPage: -1`. **If you add another "fetch the complete set" call, use `-1`** rather
+than picking a number that looks big enough; the failure mode of guessing is invisible.
+
+Note the cost this makes explicit rather than creates: any client-side-only feature (the time
+filters, the favorites sort, favorites-only) has to pull the entire matching set, because it can
+only correctly filter or order what it can see. That's inherent to doing the work client-side, not
+a flaw in `-1`. If one of these ever becomes genuinely too slow on a large library, the fix is to
+stop full-fetching rather than to re-introduce a cap — Mealie's `queryFilter` supports
+`id IN [...]` / `NOT IN [...]`, which would let the favorites sort fetch just the favorites as a
+small first block and paginate the rest normally (caveat: URL length on a very large favorite set).
+
+### Recipe list sorting (`orderBy`) — verified column names, not guesses
+Added 2026-08-26. `orderBy` takes a column name on Mealie's own `RecipeModel`, **not** the
+camelCase field name from the JSON response — sending a name that doesn't resolve to a real column
+gets a **400** back (`Invalid order_by statement "..."`, raised by `add_order_by_to_query` in
+`mealie/repos/repository_generic.py`), not a silent fallback, so these can't be guessed at.
+
+Confirmed two ways: against the model definitions (`mealie/db/models/recipe/recipe.py` plus the
+`created_at`/`update_at` columns on the shared `SqlAlchemyBase`), and against the exact strings
+Mealie's own web UI sends (`frontend/app/components/Domain/Recipe/RecipeCardSection.vue`):
+
+| Sort | `orderBy` | Default direction |
+|---|---|---|
+| Name | `name` | asc |
+| Date added | `created_at` | desc |
+| Last updated | `updated_at` | desc |
+| Rating | `rating` | desc |
+| Last made | `last_made` | desc |
+
+- **`updated_at` is a declared SQLAlchemy `synonym` for the real `update_at` column** — both
+  resolve, but `updated_at` is what Mealie's own frontend sends, so match that.
+- **All five exist as far back as v2.0.0** (checked at that tag directly), which is this app's own
+  supported floor per `isOldMealieVersion()` — so no per-version capability check is needed here.
+- `orderByNullPosition` (`'first' | 'last'`, Mealie's `OrderByNullPosition` enum) controls where
+  NULLs land on nullable columns. This app pins nulls **last in both directions** for `rating` and
+  `last_made` — deliberately different from Mealie's web UI, which puts them first when ascending.
+  "Lowest rated first" leading with a wall of *unrated* recipes ahead of the actual 1-star ones
+  isn't what anyone means by that sort. Older servers that predate this param simply ignore it
+  (it's a `Depends`-model query param, and FastAPI drops unknown ones), so it's safe to always send.
+- **"Favorites first" has no server-side equivalent and never will** — favorites are per-user rows
+  in a separate ratings table, not a column on the recipe — so it's the one client-side sort. Like
+  the prep/cook-time filters and the "favorites only" toggle, selecting it makes `useRecipes` pull
+  the whole matching set in one page (`perPage: 1000`) and disables pagination, since a client-side
+  sort can only order what it can see.
+
+`src/lib/recipeSort.ts` owns all of the above (`SORT_OPTIONS`, `nextSort()`, `sortQueryParams()`,
+`applyClientSideSort()`); `RecipeSortBar` + `RecipeSortModal` are the UI, used identically by
+`RecipesScreen` and `CookbookDetailScreen`. Tapping the active option reverses it, tapping a
+different one starts it at that option's own default direction — same interaction as Mealie's web
+UI, and what was asked for.
+
 ### Images & Assets (CRITICAL: use recipe UUID, not slug)
 `{serverUrl}/api/media/recipes/{recipeId}/images/original.webp`
 `{serverUrl}/api/media/recipes/{recipeId}/assets/{fileName}`
@@ -943,6 +1040,60 @@ those properties, and repoints `buildTypes.release.signingConfig` at it instead 
 keystore**, which is not fit for a real release. Without this plugin, every `expo prebuild --clean`
 would silently reset release builds back to debug-signed.
 
+**Gotcha (diagnosed 2026-08-26): repeated `unauthorized` from the test device is a LOCKED SCREEN,
+not a revoked authorization.** Ken asked why his Galaxy S20+ "keeps forgetting" the debugging
+authorization despite ticking "always allow". It never forgot. Ruled out, each with evidence rather
+than by guessing:
+- Host key regenerating — `~/.android/adbkey` unchanged for months, a single `adb.exe` on PATH, no
+  `ANDROID_SDK_HOME`/`ADB_VENDOR_KEYS` overrides pointing adb at a different key.
+- Samsung Auto Blocker — requires One UI 6.0+; the device runs One UI 5.1 (`ro.build.version.oneui`
+  = `50100`, Android 13).
+- Android's authorization expiry — `settings get global adb_allowed_connection_time` is unset
+  (framework default 7 days), which can't explain drops within a single session.
+- USB mode reverting to charge-only — `persist.sys.usb.config` is `mtp,conn_gadget,adb`.
+
+**Actual cause**: `stay_on_while_plugged_in` = `0` with `screen_off_timeout` = `60000`, i.e. the
+screen locks after one minute, while a full Gradle release build takes 4+ minutes. Android will not
+complete an ADB handshake against a locked screen, so any reconnect during a build lands in
+`unauthorized`. The tell was `device ... not found` followed seconds later by `device` — a USB
+re-enumeration, not a policy revocation.
+
+Fix on the device: Developer options → **Stay awake**, or
+`adb shell settings put global stay_on_while_plugged_in 7` (revert with `0`).
+**Fix on our side: don't run `adb kill-server` reflexively.** It's only needed immediately before
+`expo prebuild` (the Windows directory-lock sequence above) — running it before ordinary
+`assembleRelease` + `adb install` cycles forces a fresh handshake for no reason, which is exactly
+what fails against a locked screen. Use `adb reconnect` if a connection needs nudging. When a device
+does show `unauthorized` after previously working, try simply unlocking the phone before assuming a
+dialog needs tapping.
+
+**Gotcha (hit 2026-08-26, and will recur every time from now on): a locally-built APK can no
+longer be `adb install -r`'d over a Play Store copy.** Since the app went live on Google Play
+(2026-07-17), whatever is installed from the Store is signed with **Google's** Play App Signing
+key, while local builds are signed with the **upload** key — two different keys, so Android
+rejects the swap:
+
+```
+INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.voriseklabs.mealiego
+signatures do not match newer version; ignoring!
+```
+
+Confirm the origin before concluding anything is wrong with the build — the APK is fine:
+```powershell
+adb shell dumpsys package com.voriseklabs.mealiego | Select-String "versionName|installerPackageName"
+```
+`installerPackageName=com.android.vending` means it came from the Play Store; a sideloaded build
+shows `null` (or the shell's package). Two ways forward, and **the first one destroys data, so ask
+first rather than just running it**:
+1. `adb uninstall com.voriseklabs.mealiego` then install — wipes ALL app data: the saved server URL,
+   the SecureStore auth token, saved accounts/passwords, favorites, and the unit/language/
+   welcome-seen preferences. Requires signing back into the Mealie server by hand afterwards.
+2. Upload the AAB to a Play Console internal testing track — updates in place with no data loss,
+   but needs a Play Console round-trip rather than a 20-second `adb install`.
+
+Once a device is on a sideloaded build, subsequent local installs work normally again (both are
+upload-key-signed); the mismatch only reappears after the device takes a Play Store update.
+
 To verify a build is actually signed with the upload key (not debug) before uploading anywhere:
 ```powershell
 & "C:\Program Files\Android\Android Studio\jbr\bin\jarsigner.exe" -verify -verbose -certs app-release.aab
@@ -994,7 +1145,71 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 ## Current Build Status
 
-**Session (latest) — 2026-07-24**
+**Session (latest) — 2026-08-26**
+
+### Session 2026-08-26 — recipe list sorting, v1.8.0
+Ken: the recipes list only ever sorted alphabetically; wanted a sort button with more options
+(recently added, favorites, ...) and the ability to reverse any of them by tapping the same option
+again. Researched Mealie's actual model columns and its own web UI's sort menu before writing
+anything, rather than guessing at `orderBy` values — an unresolvable column name gets a hard 400,
+not a silent fallback, so guessing would have shipped a dead sort. Full detail in the new
+"Recipe list sorting" subsection under the API Reference above.
+- Six options: Name, Date added, Last updated, Rating, Last made, Favorites. Five are server-side;
+  Favorites is client-side (no server equivalent exists) and falls back to the same full-fetch
+  trick already used for the prep/cook-time filters and the "favorites only" toggle.
+- Tap-again-to-reverse works exactly as asked, and matches how Mealie's own web UI behaves.
+- **Put the control in a chip under the search bar, not another header icon button** — the Recipes
+  header already carries five 36px buttons (~347dp of a 360dp-wide phone once the title and padding
+  are counted); a sixth would have overflowed on narrow devices. The chip also shows which order is
+  currently active, which a bare ⇅ icon wouldn't. It renders above the error/loading branch on both
+  screens, so a sort that somehow errors can always be changed back rather than trapping the user.
+- Shared by `RecipesScreen` and `CookbookDetailScreen` via `useRecipes`, so cookbook detail got the
+  same sorting for free — same pattern as the shared filter pieces.
+- New strings added to all 11 locale files (the `recipes.sort.*` namespace plus a new Guide tip),
+  per the standing full-coverage requirement.
+- **Two follow-up fixes after Ken tested on-device**, both worth reading as bug classes:
+  1. *"Sorting by favorites hangs much longer than the other options."* The comparator had a
+     `localeCompare` name tiebreak, so the favorites sort — the only one that can't paginate, and
+     therefore runs over the FULL recipe set — did ~n log n locale-aware string comparisons
+     synchronously inside a `useMemo` during render. That blocks the JS thread, which is why it
+     read as a *hang* rather than a longer spinner. The tiebreak was never needed (the server
+     already returns the set name-ascending, and filtering preserves that order within each group);
+     `applyClientSideSort` is now an O(n) two-pass partition with zero string comparisons. Also
+     memoized `displayedRecipes` in `RecipesScreen`, which was re-filtering the full set every
+     render and handing `FlatList` a fresh array identity each time.
+  2. *"What do you mean 1,000 recipe set? There can be many more than that."* Correct — and this
+     was a **pre-existing silent-truncation bug**, not new to this feature. See the new
+     "`perPage: -1`" subsection in the API Reference above; four call sites were capping
+     "fetch everything" fetches at 200/1000 and quietly dropping whatever fell past the cap.
+- **Third round of on-device feedback: "the filter button feels laggy now, and What Can I Make?
+  takes a while — we just need to make sure every part of the app is fast, lightweight, and
+  snappy."** Partly a regression from the `perPage: -1` fix above (uncapped foods list → uncapped
+  chip rendering), partly pre-existing. See the new "List rendering" subsection in the API Reference
+  above for both causes and both fixes — capped + searchable chip sections, and a session-level
+  cache for the option lists. Resisted the temptation to "fix" this by restoring a page cap, which
+  would have traded a visible slowness back for the invisible wrong-data bug just removed.
+- Also added a match count next to the sort chip at Ken's request, on both the Recipes list and
+  cookbook detail. It reports what MATCHES the current search/filters, not what's loaded — the
+  first cut used the loaded array length, which would have read "50 recipes" after one page of a
+  500-recipe match. Server `total` where the server does the filtering; client-side count where the
+  app does (time buckets, favorites-only). Renamed `recipes.footerCount` → `recipes.count` across
+  all 11 locales since it's no longer footer-only.
+- `npx tsc --noEmit` clean. Release APK + AAB built; signature verified with `apksigner`.
+- Bumped to `1.8.0`/versionCode `32` — minor, not patch: new functionality, matching convention.
+- Installed on Ken's device (`R5CN20KJXDL`) via `adb install` and confirmed a clean launch via
+  logcat (no FATAL/AndroidRuntime exceptions). **Hit `INSTALL_FAILED_UPDATE_INCOMPATIBLE` first** —
+  see the new Play-signed-vs-upload-key gotcha under Play Store Release Signing below; Ken chose to
+  uninstall and sideload, accepting the app-data wipe and re-login.
+- **Hands-on tested and signed off by Ken** across four install/feedback rounds this session (sort
+  options + reverse behavior, the match count, and the filter/suggestions performance work): "the
+  app looks and feels good now." Not separately verified: the non-English locale strings added this
+  session, consistent with every other translation batch in this project.
+- Incidental confirmation: the 2026-07-24 pre-prebuild sequence (`adb kill-server` +
+  `gradlew -p android --stop`) worked first try on a full `expo prebuild --platform android`,
+  including the `android` directory clear that used to be where EBUSY hit. No lock issues at all
+  this session.
+
+**Session — 2026-07-24**
 
 ### Session 2026-07-24 (part 2) — root-caused the recurring `expo prebuild` EBUSY lock
 Ken pushed back on the previous session's "here's another scratch-build workaround" pattern:

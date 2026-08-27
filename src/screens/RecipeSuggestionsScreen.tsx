@@ -7,6 +7,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/mealieApi';
+import { useRecipeFilterOptions } from '../hooks/useRecipeFilterOptions';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
 import type { RecipeFood, RecipeSuggestion, RecipeTool } from '../types';
@@ -70,6 +71,7 @@ export default function RecipeSuggestionsScreen({ navigation }: Props) {
   const [foods, setFoods] = useState<RecipeFood[]>([]);
   const [tools, setTools] = useState<RecipeTool[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(true);
+  const { options, ensureLoaded } = useRecipeFilterOptions();
 
   const [selectedFoods, setSelectedFoods] = useState<Set<string>>(new Set());
   const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
@@ -77,21 +79,28 @@ export default function RecipeSuggestionsScreen({ navigation }: Props) {
   const [results, setResults] = useState<RecipeSuggestion[] | null>(null);
   const [searching, setSearching] = useState(false);
 
+  // Reuses the shared session cache rather than refetching — the foods table is
+  // large (Mealie seeds thousands of entries), and this screen was pulling it
+  // fresh on every single visit, which is what made opening it feel slow. Now
+  // only the first open in a session waits, and it also warms the cache for the
+  // recipe filter modal (and vice versa).
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       setOptionsLoading(true);
       try {
-        const [foodData, toolData] = await Promise.all([
-          api.getFoods().catch(() => ({ items: [] })),
-          api.getTools().catch(() => ({ items: [] })),
-        ]);
-        setFoods(foodData.items);
-        setTools(toolData.items);
+        await ensureLoaded();
       } finally {
-        setOptionsLoading(false);
+        if (!cancelled) setOptionsLoading(false);
       }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [ensureLoaded]);
+
+  useEffect(() => {
+    setFoods(options.foods);
+    setTools(options.tools);
+  }, [options]);
 
   const toggleFood = (id: string) => setSelectedFoods(prev => {
     const next = new Set(prev);

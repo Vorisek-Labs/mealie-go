@@ -30,7 +30,10 @@
     "tags": "ETIQUETAS",
     "tools": "UTENSILIOS",
     "foods": "INGREDIENTES",
-    "emptyOptions": "No se encontraron etiquetas, categorías, utensilios ni ingredientes en tu servidor."
+    "emptyOptions": "No se encontraron etiquetas, categorías, utensilios ni ingredientes en tu servidor.",
+    "searchPlaceholder": "Buscar…",
+    "noMatches": "Sin coincidencias",
+    "showingOf": "Mostrando {{shown}} de {{total}} — escribe para acotar"
   },
   "cookMode": {
     "ingredients": "Ingredientes",
@@ -50,8 +53,42 @@
     "emptySearchSubtitle": "Prueba a ajustar tu búsqueda o filtros",
     "emptyTitle": "Aún no hay recetas",
     "emptySubtitle": "Añade tu primera receta con el botón +",
-    "footerCount_one": "{{count}} receta",
-    "footerCount_other": "{{count}} recetas"
+    "count_one": "{{count}} receta",
+    "count_other": "{{count}} recetas",
+    "sort": {
+      "title": "Ordenar recetas",
+      "hint": "Toca de nuevo el orden activo para invertirlo.",
+      "name": {
+        "label": "Nombre",
+        "asc": "A – Z",
+        "desc": "Z – A"
+      },
+      "created": {
+        "label": "Fecha de creación",
+        "asc": "Más antiguas primero",
+        "desc": "Más recientes primero"
+      },
+      "updated": {
+        "label": "Última actualización",
+        "asc": "Actualizadas hace más tiempo",
+        "desc": "Actualizadas recientemente"
+      },
+      "rating": {
+        "label": "Valoración",
+        "asc": "Peor valoradas",
+        "desc": "Mejor valoradas"
+      },
+      "lastMade": {
+        "label": "Última vez cocinada",
+        "asc": "Hace más tiempo",
+        "desc": "Cocinadas recientemente"
+      },
+      "favorites": {
+        "label": "Favoritas",
+        "asc": "Favoritas al final",
+        "desc": "Favoritas primero"
+      }
+    }
   },
   "addRecipe": {
     "title": "Añadir receta",
@@ -448,6 +485,7 @@
       "title": "Recetas",
       "tips": [
         "Busca recetas o toca ▤ para filtrar por categoría, etiqueta, utensilio o ingrediente.",
+        "Toca el chip ⇅ debajo de la barra de búsqueda para reordenar la lista: por nombre, fecha de creación, última actualización, valoración, última vez cocinada o favoritas primero. Toca la misma opción de nuevo para invertir el orden.",
         "Toca ♡ en una receta para marcarla como favorita — toca el botón ♡/♥ en la parte superior de la lista para ver solo tus favoritas.",
         "Toca 🎲 para ir a una receta al azar.",
         "Toca 🥕 para abrir «¿Qué puedo cocinar?» — elige los ingredientes y utensilios que tengas a mano, y te sugerirá recetas que puedes preparar, indicando lo que aún te falta.",

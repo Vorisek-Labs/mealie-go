@@ -11,9 +11,11 @@ import { useRecipeFilterOptions } from '../hooks/useRecipeFilterOptions';
 import type { RecipeFilters } from '../hooks/useRecipes';
 import { api } from '../lib/mealieApi';
 import { matchesCookTimeBucket, matchesPrepTimeBucket } from '../lib/timeEstimate';
+import { applyClientSideSort, sortQueryParams } from '../lib/recipeSort';
 import { useFavorites } from '../context/FavoritesContext';
 import RecipeCard from '../components/RecipeCard';
 import RecipeFilterModal from '../components/RecipeFilterModal';
+import RecipeSortBar from '../components/RecipeSortBar';
 import ActiveFilterChips from '../components/ActiveFilterChips';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
@@ -30,7 +32,8 @@ export default function RecipesScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const {
     recipes, loading, loadingMore, error, search, setSearch,
-    refresh, loadMore, hasMore, filters, applyFilters, activeFilterCount,
+    refresh, loadMore, hasMore, total, filters, applyFilters, activeFilterCount,
+    sort, applySort,
   } = useRecipes();
 
   const { options, loading: filterLoading, ensureLoaded } = useRecipeFilterOptions();
@@ -52,18 +55,20 @@ export default function RecipesScreen({ navigation }: Props) {
     let cancelled = false;
     setLoadingFavorites(true);
     api.getRecipes({
-      perPage: 1000,
+      // -1 = every match; a fixed cap here silently hid favorites past it.
+      perPage: -1,
       search: search || undefined,
       tags: filters.tags,
       categories: filters.categories,
       tools: filters.tools,
       foods: filters.foods,
+      ...sortQueryParams(sort),
     })
       .then(data => { if (!cancelled) setFavoriteRecipesFull(data.items); })
       .catch(() => { if (!cancelled) setFavoriteRecipesFull([]); })
       .finally(() => { if (!cancelled) setLoadingFavorites(false); });
     return () => { cancelled = true; };
-  }, [favoritesOnly, search, filters]);
+  }, [favoritesOnly, search, filters, sort]);
 
   const openFilter = () => {
     setShowFilter(true);
@@ -94,13 +99,24 @@ export default function RecipesScreen({ navigation }: Props) {
     }
   };
 
-  const displayedRecipes = favoritesOnly
-    ? favoriteRecipesFull.filter(r =>
-        favoriteIds.has(r.id)
-        && matchesPrepTimeBucket(r, filters.maxPrepMinutes)
-        && matchesCookTimeBucket(r, filters.maxCookMinutes)
-      )
-    : recipes;
+  // Memoized because this filters (and re-sorts) the FULL recipe set, which the
+  // favorites-only fetch pulls in one page — recomputing it on every render also
+  // handed FlatList a new array identity each time, re-rendering the whole list.
+  const displayedRecipes = React.useMemo(() => (
+    favoritesOnly
+      // `recipes` is already sorted by the hook; this parallel favorites-only
+      // set is fetched here instead, so it needs the same client-side sort pass.
+      ? applyClientSideSort(
+          favoriteRecipesFull.filter(r =>
+            favoriteIds.has(r.id)
+            && matchesPrepTimeBucket(r, filters.maxPrepMinutes)
+            && matchesCookTimeBucket(r, filters.maxCookMinutes)
+          ),
+          sort,
+          favoriteIds,
+        )
+      : recipes
+  ), [favoritesOnly, favoriteRecipesFull, favoriteIds, filters.maxPrepMinutes, filters.maxCookMinutes, sort, recipes]);
   const showLoading = favoritesOnly ? loadingFavorites : loading;
 
   return (
@@ -164,6 +180,18 @@ export default function RecipesScreen({ navigation }: Props) {
         )}
       </View>
 
+      <RecipeSortBar
+        sort={sort}
+        onApply={applySort}
+        // Must be how many recipes MATCH, not how many are loaded —
+        // `displayedRecipes` is only the pages paginated in so far, so using it
+        // here would report "50 recipes" after one page of a 500-recipe match.
+        // `total` is the server's match count (and already accounts for the
+        // client-side time buckets). "Favorites only" is the one case filtered
+        // entirely on the device, where the full shown set IS the match set.
+        count={showLoading ? undefined : favoritesOnly ? displayedRecipes.length : total}
+      />
+
       <ActiveFilterChips filters={filters} options={options} onRemove={removeFilter} />
 
       {error ? (
@@ -205,7 +233,7 @@ export default function RecipesScreen({ navigation }: Props) {
           ListFooterComponent={loadingMore
             ? <ActivityIndicator color={colors.primary} style={styles.footerLoader} />
             : (favoritesOnly || !hasMore) && displayedRecipes.length > 0
-              ? <Text style={styles.footerText}>{t('recipes.footerCount', { count: displayedRecipes.length })}</Text>
+              ? <Text style={styles.footerText}>{t('recipes.count', { count: displayedRecipes.length })}</Text>
               : null
           }
         />

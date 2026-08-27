@@ -251,15 +251,28 @@ export interface RecipeQueryParams {
   // Recipes within a single cookbook — combines with the filters above in the
   // same request (confirmed against Mealie's recipe list route).
   cookbook?: string;
+  // Sorting. `orderBy` is a column name on Mealie's own RecipeModel, NOT the
+  // camelCase name from the JSON response — confirmed against Mealie's schema
+  // (`mealie/db/models/recipe/recipe.py` + the `SqlAlchemyBase` mixin) and
+  // against the exact values its own web UI sends (`RecipeCardSection.vue`):
+  // 'name', 'rating', 'created_at', 'updated_at', 'last_made'. Note
+  // `updated_at` is a declared synonym for the real `update_at` column — both
+  // resolve, but `updated_at` is what Mealie's own frontend sends, so match it.
+  orderBy?: string;
+  orderDirection?: 'asc' | 'desc';
+  // Where NULLs land when sorting a nullable column (rating, last_made) —
+  // 'first' | 'last', per Mealie's `OrderByNullPosition` enum.
+  orderByNullPosition?: 'first' | 'last';
 }
 
 function buildRecipeQuery(params?: RecipeQueryParams): URLSearchParams {
   const q = new URLSearchParams({
     page: String(params?.page ?? 1),
     perPage: String(params?.perPage ?? 50),
-    orderBy: 'name',
-    orderDirection: 'asc',
+    orderBy: params?.orderBy ?? 'name',
+    orderDirection: params?.orderDirection ?? 'asc',
   });
+  if (params?.orderByNullPosition) q.set('orderByNullPosition', params.orderByNullPosition);
   if (params?.search) q.set('search', params.search);
   if (params?.cookbook) q.set('cookbook', params.cookbook);
   if (params?.tags?.length) params.tags.forEach(t => q.append('tags', t));
@@ -581,17 +594,22 @@ export const api = {
     request<void>(`/api/households/cookbooks/${id}`, { method: 'DELETE' }),
 
   // Organizers (tags, categories)
+  // perPage -1 means "all of them" to Mealie (it interprets -1 as get_all, with
+  // no cap — present since v2.0.0). These populate the filter picker, so a fixed
+  // cap here (200 for organizers, 1000 for foods) silently dropped options off
+  // the end of the list on a large library, with no way for the user to tell
+  // anything was missing.
   getTags: () =>
-    request<PaginatedResponse<RecipeTag>>('/api/organizers/tags?perPage=200'),
+    request<PaginatedResponse<RecipeTag>>('/api/organizers/tags?perPage=-1'),
 
   getCategories: () =>
-    request<PaginatedResponse<RecipeCategory>>('/api/organizers/categories?perPage=200'),
+    request<PaginatedResponse<RecipeCategory>>('/api/organizers/categories?perPage=-1'),
 
   getTools: () =>
-    request<PaginatedResponse<RecipeTool>>('/api/organizers/tools?perPage=200'),
+    request<PaginatedResponse<RecipeTool>>('/api/organizers/tools?perPage=-1'),
 
   getFoods: (search?: string) => {
-    const q = new URLSearchParams({ perPage: search ? '50' : '1000', orderBy: 'name', orderDirection: 'asc' });
+    const q = new URLSearchParams({ perPage: search ? '50' : '-1', orderBy: 'name', orderDirection: 'asc' });
     if (search) q.set('search', search);
     return request<PaginatedResponse<RecipeFood>>(`/api/foods?${q}`);
   },

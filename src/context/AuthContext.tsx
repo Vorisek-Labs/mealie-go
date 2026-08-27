@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import {
   api, getServerUrl, getToken, saveServerUrl, saveToken, clearCredentials,
 } from '../lib/mealieApi';
+import { clearRecipeFilterOptionsCache } from '../hooks/useRecipeFilterOptions';
 import type { UserProfile } from '../types';
 
 // Refresh well before typical JWT expiry so the user is never forced to a
@@ -98,6 +99,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await clearCredentials();
+    // Tags/categories/tools/foods are cached per session and describe ONE
+    // server — without this the next account would see the old server's lists.
+    clearRecipeFilterOptionsCache();
     signedInRef.current = false;
     setJustSignedIn(false);
     setUser(null);

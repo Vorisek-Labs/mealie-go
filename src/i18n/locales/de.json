@@ -30,7 +30,10 @@
     "tags": "TAGS",
     "tools": "WERKZEUGE",
     "foods": "ZUTATEN",
-    "emptyOptions": "Keine Tags, Kategorien, Werkzeuge oder Zutaten auf deinem Server gefunden."
+    "emptyOptions": "Keine Tags, Kategorien, Werkzeuge oder Zutaten auf deinem Server gefunden.",
+    "searchPlaceholder": "Suchen…",
+    "noMatches": "Keine Treffer",
+    "showingOf": "Erste {{shown}} von {{total}} — tippe zum Eingrenzen"
   },
   "cookMode": {
     "ingredients": "Zutaten",
@@ -50,8 +53,42 @@
     "emptySearchSubtitle": "Versuche, deine Suche oder Filter anzupassen",
     "emptyTitle": "Noch keine Rezepte",
     "emptySubtitle": "Füge dein erstes Rezept mit der +-Schaltfläche hinzu",
-    "footerCount_one": "{{count}} Rezept",
-    "footerCount_other": "{{count}} Rezepte"
+    "count_one": "{{count}} Rezept",
+    "count_other": "{{count}} Rezepte",
+    "sort": {
+      "title": "Rezepte sortieren",
+      "hint": "Tippe die aktive Sortierung erneut an, um sie umzukehren.",
+      "name": {
+        "label": "Name",
+        "asc": "A – Z",
+        "desc": "Z – A"
+      },
+      "created": {
+        "label": "Hinzugefügt am",
+        "asc": "Älteste zuerst",
+        "desc": "Neueste zuerst"
+      },
+      "updated": {
+        "label": "Zuletzt aktualisiert",
+        "asc": "Am längsten nicht aktualisiert",
+        "desc": "Kürzlich aktualisiert"
+      },
+      "rating": {
+        "label": "Bewertung",
+        "asc": "Niedrigste Bewertung",
+        "desc": "Höchste Bewertung"
+      },
+      "lastMade": {
+        "label": "Zuletzt gekocht",
+        "asc": "Am längsten her",
+        "desc": "Kürzlich gekocht"
+      },
+      "favorites": {
+        "label": "Favoriten",
+        "asc": "Favoriten zuletzt",
+        "desc": "Favoriten zuerst"
+      }
+    }
   },
   "addRecipe": {
     "title": "Rezept hinzufügen",
@@ -448,6 +485,7 @@
       "title": "Rezepte",
       "tips": [
         "Suche nach Rezepten oder tippe auf ▤, um nach Kategorie, Tag, Werkzeug oder Zutat zu filtern.",
+        "Tippe auf den ⇅-Chip unter der Suchleiste, um die Liste neu zu sortieren — nach Name, Hinzufügedatum, letzter Aktualisierung, Bewertung, zuletzt gekocht oder Favoriten zuerst. Tippe dieselbe Option erneut an, um die Reihenfolge umzukehren.",
         "Tippe auf ♡ bei einem Rezept, um es zu favorisieren — tippe auf die ♡/♥-Schaltfläche oben in der Liste, um nur Favoriten zu sehen.",
         "Tippe auf 🎲, um zu einem zufälligen Rezept zu springen.",
         "Tippe auf 🥕, um „Was kann ich kochen?“ zu öffnen — wähle die Zutaten und Werkzeuge aus, die du zur Hand hast, und es schlägt Rezepte vor, die du zubereiten kannst, und zeigt an, was dir noch fehlt.",

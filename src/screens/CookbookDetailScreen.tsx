@@ -9,6 +9,7 @@ import type { RecipeFilters } from '../hooks/useRecipes';
 import { api } from '../lib/mealieApi';
 import RecipeCard from '../components/RecipeCard';
 import RecipeFilterModal from '../components/RecipeFilterModal';
+import RecipeSortBar from '../components/RecipeSortBar';
 import ActiveFilterChips from '../components/ActiveFilterChips';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
@@ -27,7 +28,8 @@ export default function CookbookDetailScreen({ navigation, route }: Props) {
   const { slug, name } = route.params;
   const {
     recipes, loading, loadingMore, error, search, setSearch,
-    refresh, loadMore, hasMore, filters, applyFilters, activeFilterCount,
+    refresh, loadMore, hasMore, total, filters, applyFilters, activeFilterCount,
+    sort, applySort,
   } = useRecipes(slug);
   const { options, loading: filterLoading, ensureLoaded } = useRecipeFilterOptions();
   const [showFilter, setShowFilter] = useState(false);
@@ -114,6 +116,8 @@ export default function CookbookDetailScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         )}
       </View>
+
+      <RecipeSortBar sort={sort} onApply={applySort} count={loading ? undefined : total} />
 
       <ActiveFilterChips filters={filters} options={options} onRemove={removeFilter} />
 

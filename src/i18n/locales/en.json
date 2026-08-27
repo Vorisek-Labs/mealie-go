@@ -30,7 +30,10 @@
     "tags": "TAGS",
     "tools": "TOOLS",
     "foods": "FOODS",
-    "emptyOptions": "No tags, categories, tools, or foods found on your server."
+    "emptyOptions": "No tags, categories, tools, or foods found on your server.",
+    "searchPlaceholder": "Search…",
+    "noMatches": "No matches",
+    "showingOf": "Showing first {{shown}} of {{total}} — type to narrow"
   },
   "cookMode": {
     "ingredients": "Ingredients",
@@ -50,8 +53,42 @@
     "emptySearchSubtitle": "Try adjusting your search or filters",
     "emptyTitle": "No recipes yet",
     "emptySubtitle": "Add your first recipe with the + button",
-    "footerCount_one": "{{count}} recipe",
-    "footerCount_other": "{{count}} recipes"
+    "count_one": "{{count}} recipe",
+    "count_other": "{{count}} recipes",
+    "sort": {
+      "title": "Sort Recipes",
+      "hint": "Tap the active sort again to reverse it.",
+      "name": {
+        "label": "Name",
+        "asc": "A – Z",
+        "desc": "Z – A"
+      },
+      "created": {
+        "label": "Date added",
+        "asc": "Oldest first",
+        "desc": "Newest first"
+      },
+      "updated": {
+        "label": "Last updated",
+        "asc": "Least recently updated",
+        "desc": "Recently updated"
+      },
+      "rating": {
+        "label": "Rating",
+        "asc": "Lowest rated",
+        "desc": "Highest rated"
+      },
+      "lastMade": {
+        "label": "Last made",
+        "asc": "Longest ago",
+        "desc": "Most recently made"
+      },
+      "favorites": {
+        "label": "Favorites",
+        "asc": "Favorites last",
+        "desc": "Favorites first"
+      }
+    }
   },
   "addRecipe": {
     "title": "Add Recipe",
@@ -448,6 +485,7 @@
       "title": "Recipes",
       "tips": [
         "Search recipes, or tap ▤ to filter by category, tag, tool, or ingredient.",
+        "Tap the ⇅ chip under the search bar to reorder the list — by name, date added, last updated, rating, last made, or favorites first. Tap the same option again to reverse it.",
         "Tap ♡ on a recipe to favorite it — tap the ♡/♥ button at the top of the list to see favorites only.",
         "Tap 🎲 to jump to a random recipe.",
         "Tap 🥕 to open \"What Can I Make?\" — pick the ingredients and tools you have on hand, and it suggests recipes you can make, flagging anything you're still missing.",

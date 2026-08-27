@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/mealieApi';
 import { matchesCookTimeBucket, matchesPrepTimeBucket } from '../lib/timeEstimate';
+import {
+  applyClientSideSort, DEFAULT_SORT, isClientSideSort, sortQueryParams,
+} from '../lib/recipeSort';
+import type { RecipeSort } from '../lib/recipeSort';
+import { useFavorites } from '../context/FavoritesContext';
 import type { RecipeSummary } from '../types';
 
 export interface RecipeFilters {
@@ -31,42 +36,69 @@ export function useRecipes(cookbookSlug?: string) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  // How many recipes match the current search/filters server-side — NOT how many
+  // are currently loaded into `recipes`, which in paginated mode is just the
+  // pages scrolled so far.
+  const [total, setTotal] = useState(0);
   const [filters, setFilters] = useState<RecipeFilters>(EMPTY_FILTERS);
+  const [sort, setSort] = useState<RecipeSort>(DEFAULT_SORT);
+  const { favoriteIds } = useFavorites();
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRef = useRef('');
   const filtersRef = useRef<RecipeFilters>(EMPTY_FILTERS);
+  const sortRef = useRef<RecipeSort>(DEFAULT_SORT);
 
   searchRef.current = search;
   filtersRef.current = filters;
+  sortRef.current = sort;
 
   const fetchPage = useCallback(async (
     pageNum: number,
     searchTerm: string,
     replace: boolean,
     overrideFilters?: RecipeFilters,
+    overrideSort?: RecipeSort,
   ) => {
     try {
       const f = overrideFilters ?? filtersRef.current;
-      // A prep/cook-time bucket can't be sent to the server, so when either
-      // is active we pull the whole matching set in one page and filter it
-      // here — same trick RecipesScreen already uses for "favorites only".
-      const timeFilterActive = !!f.maxPrepMinutes || !!f.maxCookMinutes;
+      const s = overrideSort ?? sortRef.current;
+      // Two things force pulling the whole matching set in one page instead of
+      // paginating: a prep/cook-time bucket (Mealie has no server-side time
+      // filter), and a sort with no server-side equivalent (favorites), which
+      // can only order what it can see. Same trick RecipesScreen already uses
+      // for "favorites only".
+      //
+      // perPage -1 means "every match" to Mealie (it interprets -1 as get_all,
+      // uncapped — present since v2.0.0, this app's supported floor). This used
+      // to be a hardcoded 1000, which SILENTLY TRUNCATED any library larger than
+      // that: recipes past #1000 alphabetically were simply absent, so a
+      // favorite or a quick-to-cook recipe sitting past the cutoff just never
+      // appeared, with nothing to indicate the list was incomplete.
+      const fullFetch = !!f.maxPrepMinutes || !!f.maxCookMinutes || isClientSideSort(s.key);
       const data = await api.getRecipes({
-        page: timeFilterActive ? 1 : pageNum,
-        perPage: timeFilterActive ? 1000 : 50,
+        page: fullFetch ? 1 : pageNum,
+        perPage: fullFetch ? -1 : 50,
         search: searchTerm || undefined,
         tags: f.tags,
         categories: f.categories,
         tools: f.tools,
         foods: f.foods,
         cookbook: cookbookSlug,
+        ...sortQueryParams(s),
       });
-      const items = timeFilterActive
+      const items = (f.maxPrepMinutes || f.maxCookMinutes)
         ? data.items.filter(r => matchesPrepTimeBucket(r, f.maxPrepMinutes) && matchesCookTimeBucket(r, f.maxCookMinutes))
         : data.items;
       setRecipes(prev => replace ? items : [...prev, ...items]);
-      setHasMore(timeFilterActive ? false : pageNum < data.total_pages);
+      // `data.total` counts what the SERVER matched, so it already reflects
+      // search + tags/categories/tools/foods + cookbook. It can't know about the
+      // prep/cook-time buckets though (those are filtered client-side above), so
+      // when either is active the honest count is what survived that filter.
+      // Safe to read `items.length` here: a time filter forces `fullFetch`, so
+      // `items` is the complete matching set rather than one page of it.
+      setTotal((f.maxPrepMinutes || f.maxCookMinutes) ? items.length : data.total);
+      setHasMore(fullFetch ? false : pageNum < data.total_pages);
       setPage(pageNum);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load recipes');
@@ -112,14 +144,31 @@ export function useRecipes(cookbookSlug?: string) {
     setLoading(false);
   }, [fetchPage]);
 
+  const applySort = useCallback(async (next: RecipeSort) => {
+    setSort(next);
+    sortRef.current = next;
+    setLoading(true);
+    setError(null);
+    await fetchPage(1, searchRef.current, true, undefined, next);
+    setLoading(false);
+  }, [fetchPage]);
+
+  // Kept out of `fetchPage` so that favouriting something re-orders the list
+  // immediately, rather than only after the next fetch.
+  const sortedRecipes = useMemo(
+    () => applyClientSideSort(recipes, sort, favoriteIds),
+    [recipes, sort, favoriteIds],
+  );
+
   const activeFilterCount =
     filters.tags.length + filters.categories.length + filters.tools.length + filters.foods.length
     + (filters.maxPrepMinutes ? 1 : 0) + (filters.maxCookMinutes ? 1 : 0);
 
   return {
-    recipes, loading, loadingMore, error,
+    recipes: sortedRecipes, loading, loadingMore, error,
     search, setSearch: handleSearch,
-    refresh, loadMore, hasMore,
+    refresh, loadMore, hasMore, total,
     filters, applyFilters, activeFilterCount,
+    sort, applySort,
   };
 }

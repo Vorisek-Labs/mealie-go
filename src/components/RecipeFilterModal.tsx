@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput,
+  TouchableOpacity, View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -162,18 +163,56 @@ function TimeBucketSection({ label, selected, onSelect }: {
   );
 }
 
+// Above this many options a section switches to search-and-cap mode. Rendering
+// every option was what made opening this modal slow: each chip is a real native
+// view, and Mealie seeds THOUSANDS of foods, so the foods section alone could ask
+// React Native to lay out several thousand views synchronously before the modal
+// could appear. Nobody scrolls a 3,000-chip wall anyway — they search.
+const CHIP_RENDER_CAP = 50;
+
 function ChipSection({ label, options, selected, onToggle }: {
   label: string;
   options: { value: string; name: string }[];
   selected: string[];
   onToggle: (value: string) => void;
 }) {
+  const { t } = useTranslation();
+  const [search, setSearch] = useState('');
+  const searchable = options.length > CHIP_RENDER_CAP;
+
+  const { shown, matchCount } = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const matches = term
+      ? options.filter(o => o.name.toLowerCase().includes(term))
+      : options;
+    // Selected options are always rendered, even when the current search text
+    // excludes them — otherwise typing would appear to silently deselect things.
+    const selectedSet = new Set(selected);
+    const picked = options.filter(o => selectedSet.has(o.value));
+    const rest = matches.filter(o => !selectedSet.has(o.value)).slice(0, CHIP_RENDER_CAP);
+    return { shown: [...picked, ...rest], matchCount: matches.length };
+  }, [options, selected, search]);
+
   if (options.length === 0) return null;
+
+  const capped = matchCount > CHIP_RENDER_CAP;
+
   return (
     <>
       <Text style={styles.sectionLabel}>{label}</Text>
+      {searchable && (
+        <TextInput
+          style={styles.sectionSearch}
+          placeholder={t('filterModal.searchPlaceholder')}
+          placeholderTextColor={colors.textDisabled}
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+      )}
       <View style={styles.chipRow}>
-        {options.map(opt => {
+        {shown.map(opt => {
           const active = selected.includes(opt.value);
           return (
             <TouchableOpacity
@@ -187,7 +226,16 @@ function ChipSection({ label, options, selected, onToggle }: {
             </TouchableOpacity>
           );
         })}
+        {matchCount === 0 && (
+          <Text style={styles.sectionHint}>{t('filterModal.noMatches')}</Text>
+        )}
       </View>
+      {/* Say so out loud rather than quietly showing a partial list. */}
+      {capped && (
+        <Text style={styles.sectionHint}>
+          {t('filterModal.showingOf', { shown: CHIP_RENDER_CAP, total: matchCount })}
+        </Text>
+      )}
     </>
   );
 }
@@ -206,6 +254,16 @@ const styles = StyleSheet.create({
   scroll: { padding: spacing.md, gap: spacing.sm, paddingBottom: 100 },
   sectionLabel: { fontSize: typography.size.xs, fontWeight: typography.weight.semibold, color: colors.textDisabled, textTransform: 'uppercase', letterSpacing: 1, marginTop: spacing.md, marginBottom: spacing.xs },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  sectionSearch: {
+    backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1,
+    borderColor: colors.border, paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2, marginBottom: spacing.sm,
+    fontSize: typography.size.sm, color: colors.textPrimary,
+  },
+  sectionHint: {
+    fontSize: typography.size.xs, color: colors.textDisabled,
+    marginTop: spacing.xs,
+  },
   chip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2, borderRadius: radius.full, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { fontSize: typography.size.sm, color: colors.textSecondary, fontWeight: typography.weight.medium },
