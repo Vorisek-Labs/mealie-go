@@ -8,7 +8,15 @@
     "noMatchesCreateNew": "没有匹配项——在上方创建一个新的。",
     "searchOrTypeNew": "搜索或输入新名称…",
     "retry": "重试",
-    "error": "错误"
+    "error": "错误",
+    "saveOrShareTitle": "保存还是分享？",
+    "saveToDevice": "保存到设备",
+    "share": "分享",
+    "savedTitle": "已保存",
+    "savedMsg": "已保存到您的设备。",
+    "saveFailedTitle": "保存失败",
+    "saveFailedMsg": "无法保存该文件。",
+    "sharingUnavailable": "此设备不支持分享。"
   },
   "time": {
     "hrMin": "{{hours}} 小时 {{minutes}} 分钟",
@@ -367,7 +375,12 @@
     "pdfServesLabel": "份量：{{count}}",
     "pdfIngredientsHeader": "食材",
     "pdfInstructionsHeader": "做法",
-    "pdfNotesHeader": "备注"
+    "pdfNotesHeader": "备注",
+    "imageLoadFailed": "无法加载此图片",
+    "imageSavedTitle": "已保存",
+    "imageSavedMsg": "已保存到 {{uri}}",
+    "imageSaveFailedTitle": "保存失败",
+    "imageSaveFailedMsg": "无法保存该文件。"
   },
   "ingredientReview": {
     "genericParseError": "无法解析食材",

@@ -8,7 +8,15 @@
     "noMatchesCreateNew": "No matches — create a new one above.",
     "searchOrTypeNew": "Search or type a new name…",
     "retry": "Retry",
-    "error": "Error"
+    "error": "Error",
+    "saveOrShareTitle": "Save or share?",
+    "saveToDevice": "Save to device",
+    "share": "Share",
+    "savedTitle": "Saved",
+    "savedMsg": "Saved to your device.",
+    "saveFailedTitle": "Couldn't save",
+    "saveFailedMsg": "The file could not be saved.",
+    "sharingUnavailable": "Sharing is not available on this device."
   },
   "time": {
     "hrMin": "{{hours}} hr {{minutes}} min",
@@ -335,7 +343,12 @@
     "pdfServesLabel": "Serves: {{count}}",
     "pdfIngredientsHeader": "Ingredients",
     "pdfInstructionsHeader": "Instructions",
-    "pdfNotesHeader": "Notes"
+    "pdfNotesHeader": "Notes",
+    "imageLoadFailed": "Could not load this image",
+    "imageSavedTitle": "Saved",
+    "imageSavedMsg": "Saved to {{uri}}",
+    "imageSaveFailedTitle": "Couldn't save",
+    "imageSaveFailedMsg": "The file could not be saved."
   },
   "ingredientReview": {
     "genericParseError": "Could not parse ingredients",

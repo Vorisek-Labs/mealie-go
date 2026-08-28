@@ -8,7 +8,15 @@
     "noMatchesCreateNew": "কোনো মিল নেই — উপরে একটি নতুন তৈরি করুন।",
     "searchOrTypeNew": "খুঁজুন বা নতুন নাম টাইপ করুন…",
     "retry": "পুনরায় চেষ্টা করুন",
-    "error": "ত্রুটি"
+    "error": "ত্রুটি",
+    "saveOrShareTitle": "সংরক্ষণ নাকি শেয়ার?",
+    "saveToDevice": "ডিভাইসে সংরক্ষণ করুন",
+    "share": "শেয়ার করুন",
+    "savedTitle": "সংরক্ষিত",
+    "savedMsg": "আপনার ডিভাইসে সংরক্ষিত হয়েছে।",
+    "saveFailedTitle": "সংরক্ষণ করা যায়নি",
+    "saveFailedMsg": "ফাইলটি সংরক্ষণ করা যায়নি।",
+    "sharingUnavailable": "এই ডিভাইসে শেয়ার করা উপলব্ধ নয়।"
   },
   "time": {
     "hrMin": "{{hours}} ঘ. {{minutes}} মি.",
@@ -374,7 +382,12 @@
     "pdfServesLabel": "পরিবেশন: {{count}}",
     "pdfIngredientsHeader": "উপকরণ",
     "pdfInstructionsHeader": "নির্দেশনা",
-    "pdfNotesHeader": "নোট"
+    "pdfNotesHeader": "নোট",
+    "imageLoadFailed": "এই ছবিটি লোড করা যায়নি",
+    "imageSavedTitle": "সংরক্ষিত",
+    "imageSavedMsg": "{{uri}}-এ সংরক্ষিত",
+    "imageSaveFailedTitle": "সংরক্ষণ করা যায়নি",
+    "imageSaveFailedMsg": "ফাইলটি সংরক্ষণ করা যায়নি।"
   },
   "ingredientReview": {
     "genericParseError": "উপকরণ পার্স করা যায়নি",

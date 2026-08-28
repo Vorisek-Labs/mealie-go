@@ -8,7 +8,15 @@
     "noMatchesCreateNew": "Aucun résultat — créez-en un nouveau ci-dessus.",
     "searchOrTypeNew": "Recherchez ou saisissez un nouveau nom…",
     "retry": "Réessayer",
-    "error": "Erreur"
+    "error": "Erreur",
+    "saveOrShareTitle": "Enregistrer ou partager ?",
+    "saveToDevice": "Enregistrer sur l'appareil",
+    "share": "Partager",
+    "savedTitle": "Enregistré",
+    "savedMsg": "Enregistré sur votre appareil.",
+    "saveFailedTitle": "Échec de l'enregistrement",
+    "saveFailedMsg": "Le fichier n'a pas pu être enregistré.",
+    "sharingUnavailable": "Le partage n'est pas disponible sur cet appareil."
   },
   "time": {
     "hrMin": "{{hours}} h {{minutes}} min",
@@ -374,7 +382,12 @@
     "pdfServesLabel": "Portions : {{count}}",
     "pdfIngredientsHeader": "Ingrédients",
     "pdfInstructionsHeader": "Instructions",
-    "pdfNotesHeader": "Notes"
+    "pdfNotesHeader": "Notes",
+    "imageLoadFailed": "Impossible de charger cette image",
+    "imageSavedTitle": "Enregistré",
+    "imageSavedMsg": "Enregistré dans {{uri}}",
+    "imageSaveFailedTitle": "Échec de l'enregistrement",
+    "imageSaveFailedMsg": "Le fichier n'a pas pu être enregistré."
   },
   "ingredientReview": {
     "genericParseError": "Impossible d'analyser les ingrédients",

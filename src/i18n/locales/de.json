@@ -8,7 +8,15 @@
     "noMatchesCreateNew": "Keine Treffer — erstelle oben ein neues.",
     "searchOrTypeNew": "Suchen oder neuen Namen eingeben…",
     "retry": "Wiederholen",
-    "error": "Fehler"
+    "error": "Fehler",
+    "saveOrShareTitle": "Speichern oder teilen?",
+    "saveToDevice": "Auf Gerät speichern",
+    "share": "Teilen",
+    "savedTitle": "Gespeichert",
+    "savedMsg": "Auf deinem Gerät gespeichert.",
+    "saveFailedTitle": "Speichern fehlgeschlagen",
+    "saveFailedMsg": "Die Datei konnte nicht gespeichert werden.",
+    "sharingUnavailable": "Teilen ist auf diesem Gerät nicht verfügbar."
   },
   "time": {
     "hrMin": "{{hours}} Std. {{minutes}} Min.",
@@ -374,7 +382,12 @@
     "pdfServesLabel": "Portionen: {{count}}",
     "pdfIngredientsHeader": "Zutaten",
     "pdfInstructionsHeader": "Anleitung",
-    "pdfNotesHeader": "Notizen"
+    "pdfNotesHeader": "Notizen",
+    "imageLoadFailed": "Bild konnte nicht geladen werden",
+    "imageSavedTitle": "Gespeichert",
+    "imageSavedMsg": "Gespeichert unter {{uri}}",
+    "imageSaveFailedTitle": "Speichern fehlgeschlagen",
+    "imageSaveFailedMsg": "Die Datei konnte nicht gespeichert werden."
   },
   "ingredientReview": {
     "genericParseError": "Zutaten konnten nicht analysiert werden",

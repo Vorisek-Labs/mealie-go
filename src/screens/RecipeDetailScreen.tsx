@@ -6,13 +6,15 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { useRecipeMedia } from '../hooks/useRecipeMedia';
-import { api, recipeAssetUrl, recipeImageSource } from '../lib/mealieApi';
+import { api, isImageFileName, recipeAssetUrl, recipeImageSource } from '../lib/mealieApi';
+import ImageViewerModal from '../components/ImageViewerModal';
+import { promptSaveOrShare } from '../lib/saveFile';
+import type { ViewableImage } from '../components/ImageViewerModal';
 import CookModeModal from '../components/CookModeModal';
 import { displayCookTime, formatTimeText } from '../lib/timeEstimate';
 import {
@@ -140,6 +142,7 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
   const [shareTokensLoading, setShareTokensLoading] = useState(false);
   const [creatingToken, setCreatingToken] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [viewerImage, setViewerImage] = useState<ViewableImage | null>(null);
 
   const [showListPicker, setShowListPicker] = useState(false);
   const [shoppingLists, setShoppingLists] = useState<ShoppingList[]>([]);
@@ -385,11 +388,10 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
 
       const html = buildRecipePdfHtml(recipe, imageTag);
       const { uri } = await Print.printToFileAsync({ html });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
-      } else {
-        Alert.alert(t('recipeDetail.exportedTitle'), t('recipeDetail.exportedMsg', { uri }));
-      }
+      // Offers a real save-to-a-folder as well as sharing — a share sheet isn't
+      // a download, and "export" that can only hand the file to another app is
+      // a dead end if what you wanted was the PDF on your device.
+      promptSaveOrShare(uri, `${recipe.slug}.pdf`, 'application/pdf');
     } catch (e) {
       Alert.alert(t('recipeDetail.exportFailedTitle'), e instanceof Error ? e.message : t('recipeDetail.genericExportError'));
     } finally {
@@ -443,9 +445,16 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
     ]);
   };
 
+  // Images open in-app; anything else (PDFs, docs) still goes out to whatever
+  // app handles that type, since nothing here can render them.
   const openAsset = (fileName: string) => {
     if (!recipe) return;
-    Linking.openURL(recipeAssetUrl(serverUrl, recipe.id, fileName)).catch(() =>
+    const url = recipeAssetUrl(serverUrl, recipe.id, fileName);
+    if (isImageFileName(fileName)) {
+      setViewerImage({ uri: url, headers: { Authorization: `Bearer ${token}` }, fileName });
+      return;
+    }
+    Linking.openURL(url).catch(() =>
       Alert.alert(t('recipeDetail.cannotOpenTitle'), t('recipeDetail.cannotOpenMsg'))
     );
   };
@@ -498,12 +507,23 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {imgSrc ? (
-          <Image
-            source={imgSrc}
-            style={styles.heroImage}
-            resizeMode="cover"
-            onError={() => setImgError(true)}
-          />
+          // Tap to see the whole image — the hero is cropped (`cover`), so the
+          // full picture isn't visible anywhere else in the app.
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => setViewerImage({
+              uri: imgSrc.uri,
+              headers: { Authorization: `Bearer ${token}` },
+              fileName: `${recipe.slug}.webp`,
+            })}
+          >
+            <Image
+              source={imgSrc}
+              style={styles.heroImage}
+              resizeMode="cover"
+              onError={() => setImgError(true)}
+            />
+          </TouchableOpacity>
         ) : (
           <View style={styles.heroPlaceholder}>
             <Text style={styles.heroPlaceholderIcon}>🍽️</Text>
@@ -855,6 +875,12 @@ export default function RecipeDetailScreen({ navigation, route }: Props) {
         recipeName={recipe.name}
         steps={cookModeSteps}
         ingredientLines={ingredientDisplayLines.map((text, i) => ({ text, title: recipe.recipeIngredient[i]?.title ?? undefined }))}
+      />
+
+      <ImageViewerModal
+        visible={!!viewerImage}
+        image={viewerImage}
+        onClose={() => setViewerImage(null)}
       />
     </View>
   );

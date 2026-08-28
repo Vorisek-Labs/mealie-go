@@ -8,7 +8,15 @@
     "noMatchesCreateNew": "कोई मिलान नहीं — ऊपर एक नया बनाएं।",
     "searchOrTypeNew": "खोजें या नया नाम टाइप करें…",
     "retry": "पुनः प्रयास करें",
-    "error": "त्रुटि"
+    "error": "त्रुटि",
+    "saveOrShareTitle": "सहेजें या साझा करें?",
+    "saveToDevice": "डिवाइस में सहेजें",
+    "share": "साझा करें",
+    "savedTitle": "सहेजा गया",
+    "savedMsg": "आपके डिवाइस में सहेजा गया।",
+    "saveFailedTitle": "सहेजा नहीं जा सका",
+    "saveFailedMsg": "फ़ाइल सहेजी नहीं जा सकी।",
+    "sharingUnavailable": "इस डिवाइस पर साझा करना उपलब्ध नहीं है।"
   },
   "time": {
     "hrMin": "{{hours}} घं. {{minutes}} मि.",
@@ -374,7 +382,12 @@
     "pdfServesLabel": "सर्विंग्स: {{count}}",
     "pdfIngredientsHeader": "सामग्री",
     "pdfInstructionsHeader": "निर्देश",
-    "pdfNotesHeader": "नोट्स"
+    "pdfNotesHeader": "नोट्स",
+    "imageLoadFailed": "यह छवि लोड नहीं हो सकी",
+    "imageSavedTitle": "सहेजा गया",
+    "imageSavedMsg": "{{uri}} में सहेजा गया",
+    "imageSaveFailedTitle": "सहेजा नहीं जा सका",
+    "imageSaveFailedMsg": "फ़ाइल सहेजी नहीं जा सकी।"
   },
   "ingredientReview": {
     "genericParseError": "सामग्री का विश्लेषण नहीं किया जा सका",

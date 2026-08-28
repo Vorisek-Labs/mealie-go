@@ -8,7 +8,15 @@
     "noMatchesCreateNew": "Совпадений нет — создайте новый вариант выше.",
     "searchOrTypeNew": "Найдите или введите новое название…",
     "retry": "Повторить",
-    "error": "Ошибка"
+    "error": "Ошибка",
+    "saveOrShareTitle": "Сохранить или поделиться?",
+    "saveToDevice": "Сохранить на устройство",
+    "share": "Поделиться",
+    "savedTitle": "Сохранено",
+    "savedMsg": "Сохранено на вашем устройстве.",
+    "saveFailedTitle": "Не удалось сохранить",
+    "saveFailedMsg": "Не удалось сохранить файл.",
+    "sharingUnavailable": "Отправка недоступна на этом устройстве."
   },
   "time": {
     "hrMin": "{{hours}} ч {{minutes}} мин",
@@ -388,7 +396,12 @@
     "pdfServesLabel": "Порции: {{count}}",
     "pdfIngredientsHeader": "Ингредиенты",
     "pdfInstructionsHeader": "Инструкции",
-    "pdfNotesHeader": "Заметки"
+    "pdfNotesHeader": "Заметки",
+    "imageLoadFailed": "Не удалось загрузить изображение",
+    "imageSavedTitle": "Сохранено",
+    "imageSavedMsg": "Сохранено в {{uri}}",
+    "imageSaveFailedTitle": "Не удалось сохранить",
+    "imageSaveFailedMsg": "Не удалось сохранить файл."
   },
   "ingredientReview": {
     "genericParseError": "Не удалось разобрать ингредиенты",

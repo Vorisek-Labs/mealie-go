@@ -8,7 +8,15 @@
     "noMatchesCreateNew": "لا توجد نتائج مطابقة — أنشئ عنصرًا جديدًا أعلاه.",
     "searchOrTypeNew": "ابحث أو اكتب اسمًا جديدًا…",
     "retry": "إعادة المحاولة",
-    "error": "خطأ"
+    "error": "خطأ",
+    "saveOrShareTitle": "حفظ أم مشاركة؟",
+    "saveToDevice": "حفظ على الجهاز",
+    "share": "مشاركة",
+    "savedTitle": "تم الحفظ",
+    "savedMsg": "تم الحفظ على جهازك.",
+    "saveFailedTitle": "تعذر الحفظ",
+    "saveFailedMsg": "تعذر حفظ الملف.",
+    "sharingUnavailable": "المشاركة غير متاحة على هذا الجهاز."
   },
   "time": {
     "hrMin": "{{hours}} س {{minutes}} د",
@@ -367,7 +375,12 @@
     "pdfServesLabel": "الحصص: {{count}}",
     "pdfIngredientsHeader": "المكوّنات",
     "pdfInstructionsHeader": "التعليمات",
-    "pdfNotesHeader": "الملاحظات"
+    "pdfNotesHeader": "الملاحظات",
+    "imageLoadFailed": "تعذر تحميل هذه الصورة",
+    "imageSavedTitle": "تم الحفظ",
+    "imageSavedMsg": "تم الحفظ في {{uri}}",
+    "imageSaveFailedTitle": "تعذر الحفظ",
+    "imageSaveFailedMsg": "تعذر حفظ الملف."
   },
   "ingredientReview": {
     "genericParseError": "تعذر تحليل المكوّنات",

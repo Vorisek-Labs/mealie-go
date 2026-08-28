@@ -8,7 +8,15 @@
     "noMatchesCreateNew": "Nenhuma correspondência — crie uma nova acima.",
     "searchOrTypeNew": "Pesquise ou digite um novo nome…",
     "retry": "Tentar novamente",
-    "error": "Erro"
+    "error": "Erro",
+    "saveOrShareTitle": "Salvar ou compartilhar?",
+    "saveToDevice": "Salvar no dispositivo",
+    "share": "Compartilhar",
+    "savedTitle": "Salvo",
+    "savedMsg": "Salvo no seu dispositivo.",
+    "saveFailedTitle": "Não foi possível salvar",
+    "saveFailedMsg": "O arquivo não pôde ser salvo.",
+    "sharingUnavailable": "Compartilhamento não está disponível neste dispositivo."
   },
   "time": {
     "hrMin": "{{hours}} h {{minutes}} min",
@@ -374,7 +382,12 @@
     "pdfServesLabel": "Porções: {{count}}",
     "pdfIngredientsHeader": "Ingredientes",
     "pdfInstructionsHeader": "Instruções",
-    "pdfNotesHeader": "Notas"
+    "pdfNotesHeader": "Notas",
+    "imageLoadFailed": "Não foi possível carregar esta imagem",
+    "imageSavedTitle": "Salvo",
+    "imageSavedMsg": "Salvo em {{uri}}",
+    "imageSaveFailedTitle": "Não foi possível salvar",
+    "imageSaveFailedMsg": "O arquivo não pôde ser salvo."
   },
   "ingredientReview": {
     "genericParseError": "Não foi possível analisar os ingredientes",

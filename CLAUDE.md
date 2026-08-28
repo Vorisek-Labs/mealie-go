@@ -799,6 +799,47 @@ npx tsc --noEmit      # type check
 
 ---
 
+## Viewing and saving files (image viewer, save-to-device)
+
+Added 2026-08-27 after Ken asked whether attachments and the header image could be viewed without
+downloading them. Both were worse than "requires a download":
+- The recipe hero image had **no tap handler at all**, and renders `resizeMode="cover"` — so the
+  full, uncropped image was not visible anywhere in the app, at any size.
+- Attachments called `Linking.openURL(recipeAssetUrl(...))`, handing a **bare URL with no
+  Authorization header** to the OS. Mealie's media endpoints are Bearer-authenticated (that's why
+  `recipeImageSource()` returns `{ uri, headers }` and why the PDF export base64-inlines the image),
+  so this only worked if the phone's browser happened to hold a Mealie session cookie. Fragile by
+  construction, not merely inconvenient.
+
+`components/ImageViewerModal.tsx` — full-screen viewer, `resizeMode="contain"`, tap to dismiss, with
+a ✕ and a save button in a toolbar that adds `useSafeAreaInsets().top` by hand (it sits against the
+physical top edge under edge-to-edge). It takes the same `{ uri, headers }` shape used everywhere
+else for Mealie media, which is what fixes the auth problem for images. Wired to the hero image and
+to image attachments; PDFs/documents still go out via `Linking.openURL`, since nothing here can
+render them — **that auth fragility remains for non-image attachments** and is the obvious next fix
+if anyone reports it. No pinch-to-zoom: RN's built-in `ScrollView` zoom is iOS-only, and doing it on
+Android means either hand-rolled gesture code or adding `react-native-reanimated`, which this project
+deliberately doesn't use. Ken chose to skip it.
+
+**Loading state must be derived from the URI, not reset on open.** The first version set
+`loading = true` in the modal's `onShow`, which deadlocked the spinner **only for the hero image**:
+it's already in RN's image cache (it's rendered on the screen behind the modal), so it fired
+`onLoadEnd` *before* `onShow` ran, and `onShow` then re-armed a spinner nothing would ever clear.
+Attachments hid the bug entirely because they've never been rendered before, so they always load
+after `onShow`. Now tracked as `loadedUri`/`failedUri` compared against the current image's URI,
+which has no ordering assumption and resets itself when a different image is opened. Watch for this
+pattern anywhere a modal shows a possibly-cached image.
+
+`lib/saveFile.ts` — `promptSaveOrShare()`, used by both the PDF export and the viewer's save button.
+**A share sheet is not a download**, which is what Ken pointed out about PDF export. On Android it
+offers a real save via the **Storage Access Framework**: the system folder picker, then a file
+written into the chosen directory. SAF needs no storage permission (granting access to the folder is
+the permission) and **derives the file extension from the mime type**, appending it itself — so pass
+a base name with the extension stripped, or you get `recipe.pdf.pdf`. On iOS there's no user-visible
+filesystem, so the share sheet ("Save to Files") stays the only sensible answer and no choice is
+offered; the helper returns which action actually happened so the confirmation never claims "saved"
+after a share. Cancelling the folder picker is a no, not an error — no alert.
+
 ## R8 / code shrinking (enabled 2026-08-26, **NOT yet cleared for release**)
 
 Turned on after Google Play's "App is not optimized" recommendation on the v1.7.0 bundle. Enabled
@@ -846,22 +887,26 @@ and `ActivityIndicatorViewManagerDelegate` were also removed, which looked alarm
 those serve the old Paper path, and both safe-area insets and spinners were confirmed working
 on-device afterwards.
 
-### ⚠ DO NOT UPLOAD v1.8.1 TO PLAY UNTIL THESE PASS
-`app.json` is already bumped to `1.8.1`/versionCode `33` with R8 enabled, and the change is
-committed — but it is **NOT release-verified**. Build success proves nothing here; R8 failures
-surface at runtime as `ClassNotFoundException`/`NoSuchMethodError` when a native module initialises.
-Verified on-device 2026-08-26 (Android 13, `R5CN20KJXDL`):
+### R8 release verification — 7 of 8 done
+Build success proves nothing here; R8 failures surface at runtime as
+`ClassNotFoundException`/`NoSuchMethodError` when a native module initialises, so every
+native-module-backed feature needed exercising by hand. Verified on-device 2026-08-26/27
+(Android 13, `R5CN20KJXDL`):
 - [x] Cold launch, module registration, full recipe list render, auth-headered recipe images
 - [x] Safe-area insets correct (tab bar clear of the system nav bar)
 - [x] Loading spinner / pull-to-refresh (`ActivityIndicator`)
 - [x] Splash screen on cold start
 
-**Still untested — Ken deferred these, do them before any v1.8.1 release:**
-- [ ] **Recipe image upload** (`expo-image-picker` + the multipart `FormData` path) — highest risk;
-      this is the same path that broke in the SDK 57 upgrade
-- [ ] **PDF export** (`expo-print` + `expo-sharing`)
-- [ ] **Attachment upload** (`expo-document-picker`)
-- [ ] **Language switch in Settings** (`expo-localization`)
+- [x] **Recipe image upload** (`expo-image-picker` + the multipart `FormData` path) — the highest-risk
+      item, being the same path that broke in the SDK 57 upgrade. Confirmed working 2026-08-27.
+- [x] **PDF export** (`expo-print`, plus the new save-to-device path)
+- [x] **Language switch in Settings** (`expo-localization`)
+
+**Still untested as of the v1.8.1 release:**
+- [ ] **Attachment upload** (`expo-document-picker`) — the only R8 path never exercised. Note that
+      *opening* an image attachment does NOT cover this: since the in-app image viewer landed, that
+      route goes through `ImageViewerModal`, not the document picker. Only "+ Add" in a recipe's
+      Attachments section actually exercises it.
 
 If one fails, the fix is a targeted `-keep` rule added via `extraProguardRules`; logcat will name
 the stripped class directly. If R8 has to be abandoned, revert the two `app.json` properties — the
@@ -1213,7 +1258,25 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 ## Current Build Status
 
-**Session (latest) — 2026-08-26**
+**Session (latest) — 2026-08-27**
+
+### Session 2026-08-27 — in-app image viewer, real save-to-device, v1.8.1 released
+- Ken asked whether attachments/the header image could be viewed without downloading. Investigating
+  turned up two things worse than the inconvenience he described — the hero image had no tap handler
+  and is cropped (so the full image was never visible anywhere), and attachments were opened with a
+  **bare unauthenticated URL**, which only worked via a browser session cookie. Both fixed; full
+  detail in the new "Viewing and saving files" section above.
+- Then: *"would be nice to give the option to download the pdf rather than just share it"* — fair,
+  a share sheet isn't a download. Added `lib/saveFile.ts` with a real Storage Access Framework save
+  on Android, and applied it to the image viewer's save button too, which had exactly the same
+  mismatch (labelled download, only shared).
+- **R8 verification finished at 7 of 8** across the session; only attachment *upload*
+  (`expo-document-picker`) was never exercised. Called out explicitly at release time rather than
+  quietly shipped — see the R8 section above.
+- Released **v1.8.1**/versionCode `33` (R8 + image viewer + save-to-device) to GitHub; Ken uploads
+  the AAB to Play Console.
+
+**Session — 2026-08-26**
 
 ### Session 2026-08-26 (part 2) — v1.8.0 shipped; R8 enabled but NOT release-verified
 - **v1.8.0 shipped to all three surfaces** per the standing checklist: pushed to `master`, tagged

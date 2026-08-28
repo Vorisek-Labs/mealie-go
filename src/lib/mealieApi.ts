@@ -238,9 +238,19 @@ function mimeTypeForExtension(ext: string): string {
   return known[ext] ?? 'application/octet-stream';
 }
 
+// Kept alongside assetIconForExtension so the two lists can't drift — an
+// attachment shown with a picture icon is exactly the one that should open in
+// the in-app image viewer rather than being handed to an external app.
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif'];
+
+export function isImageFileName(fileName: string): boolean {
+  const match = /\.([a-zA-Z0-9]+)$/.exec(fileName.split('?')[0]);
+  return !!match && IMAGE_EXTENSIONS.includes(match[1].toLowerCase());
+}
+
 export function assetIconForExtension(ext: string): string {
   if (ext === 'pdf') return 'mdi-file-pdf-box';
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif'].includes(ext)) return 'mdi-file-image';
+  if (IMAGE_EXTENSIONS.includes(ext)) return 'mdi-file-image';
   if (ext === 'json') return 'mdi-code-json';
   return 'mdi-file';
 }

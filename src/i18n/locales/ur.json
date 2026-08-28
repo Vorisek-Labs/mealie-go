@@ -8,7 +8,15 @@
     "noMatchesCreateNew": "کوئی مماثلت نہیں — اوپر ایک نیا بنائیں۔",
     "searchOrTypeNew": "تلاش کریں یا نیا نام ٹائپ کریں…",
     "retry": "دوبارہ کوشش کریں",
-    "error": "خرابی"
+    "error": "خرابی",
+    "saveOrShareTitle": "محفوظ کریں یا شیئر کریں؟",
+    "saveToDevice": "ڈیوائس میں محفوظ کریں",
+    "share": "شیئر کریں",
+    "savedTitle": "محفوظ ہو گیا",
+    "savedMsg": "آپ کے ڈیوائس میں محفوظ ہو گیا۔",
+    "saveFailedTitle": "محفوظ نہیں کیا جا سکا",
+    "saveFailedMsg": "فائل محفوظ نہیں کی جا سکی۔",
+    "sharingUnavailable": "اس ڈیوائس پر شیئرنگ دستیاب نہیں ہے۔"
   },
   "time": {
     "hrMin": "{{hours}} گھنٹے {{minutes}} منٹ",
@@ -374,7 +382,12 @@
     "pdfServesLabel": "سرونگز: {{count}}",
     "pdfIngredientsHeader": "اجزاء",
     "pdfInstructionsHeader": "ہدایات",
-    "pdfNotesHeader": "نوٹس"
+    "pdfNotesHeader": "نوٹس",
+    "imageLoadFailed": "یہ تصویر لوڈ نہیں ہو سکی",
+    "imageSavedTitle": "محفوظ ہو گیا",
+    "imageSavedMsg": "{{uri}} میں محفوظ ہو گیا",
+    "imageSaveFailedTitle": "محفوظ نہیں کیا جا سکا",
+    "imageSaveFailedMsg": "فائل محفوظ نہیں کی جا سکی۔"
   },
   "ingredientReview": {
     "genericParseError": "اجزاء کا تجزیہ نہیں کیا جا سکا",
