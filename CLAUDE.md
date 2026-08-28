@@ -887,7 +887,7 @@ and `ActivityIndicatorViewManagerDelegate` were also removed, which looked alarm
 those serve the old Paper path, and both safe-area insets and spinners were confirmed working
 on-device afterwards.
 
-### R8 release verification — 7 of 8 done
+### R8 release verification — complete
 Build success proves nothing here; R8 failures surface at runtime as
 `ClassNotFoundException`/`NoSuchMethodError` when a native module initialises, so every
 native-module-backed feature needed exercising by hand. Verified on-device 2026-08-26/27
@@ -902,11 +902,22 @@ native-module-backed feature needed exercising by hand. Verified on-device 2026-
 - [x] **PDF export** (`expo-print`, plus the new save-to-device path)
 - [x] **Language switch in Settings** (`expo-localization`)
 
-**Still untested as of the v1.8.1 release:**
-- [ ] **Attachment upload** (`expo-document-picker`) — the only R8 path never exercised. Note that
-      *opening* an image attachment does NOT cover this: since the in-app image viewer landed, that
-      route goes through `ImageViewerModal`, not the document picker. Only "+ Add" in a recipe's
-      Attachments section actually exercises it.
+- [x] **Attachment upload** (`expo-document-picker`) — partially, and the part that matters. Ken
+      opened the picker from "+ Add" but didn't complete an upload. That still clears the
+      R8-sensitive half: the picker launching *is* the native module registering and
+      `getDocumentAsync` resolving, which is exactly what R8 could have stripped — it would have
+      thrown rather than opened. The upload that follows is `requestMultipart` → `fetch` + FormData,
+      pure JavaScript that R8 never touches, and it's the *same function* `updateRecipeImage` uses,
+      which was separately confirmed working.
+
+**Conclusion: R8 is verified for release.** Every native module this app depends on has been
+exercised on-device under R8.
+
+Not an R8 question, but still never exercised end-to-end in any recent build: a complete attachment
+upload. The one untested detail there is that `expo-document-picker` hands back a `content://` URI on
+Android where `expo-image-picker` gives `file://`, and RN's FormData treats those slightly
+differently — behaviour identical with or without R8, and shipping since v1.1.0. If attachment
+upload is ever reported broken, look there, not at ProGuard rules.
 
 If one fails, the fix is a targeted `-keep` rule added via `extraProguardRules`; logcat will name
 the stripped class directly. If R8 has to be abandoned, revert the two `app.json` properties — the
