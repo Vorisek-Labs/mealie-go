@@ -210,9 +210,33 @@ Base URL: whatever the user entered on ConnectScreen.
 | GET | `/api/recipes` | `?page=1&perPage=50&search=&orderBy=name` — filters: repeatable `categories=`, `tags=`, `tools=` (slugs) and `foods=` (**UUIDs** — foods have no slug) |
 | GET | `/api/recipes/{slug}` | Full recipe with ingredients + instructions |
 | POST | `/api/recipes` | Body: `{ name }` → returns slug string |
-| POST | `/api/recipes/create/url` | Body: `{ url }` → returns slug string. **Not** `/create-url` (the old path) — current Mealie versions moved this under `/create/url`, grouped with the streaming (`/create/url/stream`) and bulk (`/create/url/bulk`) variants; the old flat path now gets matched by `/recipes/{slug}` instead (treating "create-url" as a slug), which returns 405 since that route doesn't support POST. |
+| POST | `/api/recipes/create/url` | Body: `{ url }` → returns slug string. **Not** `/create-url` (the old path) — current Mealie versions moved this under `/create/url`, grouped with the streaming (`/create/url/stream`) and bulk (`/create/url/bulk`) variants; the old flat path now gets matched by `/recipes/{slug}` instead (treating "create-url" as a slug), which returns 405 since that route doesn't support POST. **The app no longer calls this directly** — only as a fallback when the stream route below 404s (servers older than v3.13.0). |
+| POST | `/api/recipes/create/url/stream` | Same body, answered as Server-Sent Events: `progress` `{message}` (translated via `Accept-Language`), then `done` `{slug}` or `error` `{message}`. **This is what URL import uses** (v1.8.2+). See below. |
 | PUT | `/api/recipes/{slug}` | Full recipe body |
 | DELETE | `/api/recipes/{slug}` | |
+
+**URL import must use the stream route — a reverse proxy will time out the plain one (HTTP 524).**
+Found 2026-09-14: Ken's Instagram video import failed with `524`, which is **Cloudflare's** "origin
+didn't respond within 100s" error, not a Mealie one. Since v3.13.0 a URL import runs through a chain
+of scrapers (`scraper_strategies.py`), and a video URL (Instagram/TikTok/YouTube, detected by yt-dlp)
+makes the server download the audio, transcribe it with AI, and run an LLM over the transcript
+before it has a slug. The plain `/create/url` route awaits all of that before sending a single byte,
+so any proxy with a response timeout kills it — **while Mealie keeps working and saves the recipe
+anyway**, so the app reported a failure for an import that actually succeeded. The stream route
+(PR #7252, also v3.13.0, and what Mealie's own web UI calls) sends headers immediately and events as
+it goes. Implemented in `streamRecipeImport()` in `mealieApi.ts`:
+- **`XMLHttpRequest`, not `fetch`** — RN's fetch (which this app deliberately uses, see the
+  `EXPO_PUBLIC_USE_RN_FETCH` note) can't read a response body incrementally. RN's XHR can: setting
+  `onprogress` turns on incremental delivery, and `responseText` grows as chunks arrive.
+- 404/405 → falls back to the plain route via `request()`, which also brings the 405
+  redirect-downgrade scheme-flip retry along with it.
+- `AddRecipeScreen` shows the progress message under the Import button, passing `i18n.language` as
+  `Accept-Language` so Mealie's own translations are used — no new locale keys needed.
+- **Residual risk**: Cloudflare also has a ~100s *idle* timeout between bytes. Mealie emits no event
+  during a single long stage (e.g. transcribing a very long video), so a pathological case could
+  still 524. Not seen in testing; the fix for that would be on the server/proxy side, not the app.
+- Confirmed working on-device against Ken's Cloudflare-fronted server with the same Instagram URL
+  that had 524'd.
 
 **`RecipeIngredient.disableAmount` does not exist on Mealie v3+** — confirmed against Mealie's own
 schema (`RecipeIngredientBase` in `mealie/schema/recipe/recipe_ingredient.py`): this field was
@@ -1269,7 +1293,24 @@ At the end of every session, commit all changes AND update the Current Build Sta
 
 ## Current Build Status
 
-**Session (latest) — 2026-08-27**
+**Session (latest) — 2026-09-14**
+
+### Session 2026-09-14 — URL import 524 on video URLs, v1.8.2
+- Ken: importing an Instagram video failed with "error code 524"; normal web-page imports still
+  worked. 524 is Cloudflare's origin-timeout, so the cause was the plain `/create/url` route sitting
+  silent for 100s+ while Mealie transcribed the video. Researched Mealie's source before changing
+  anything (stream route shape, event names, version introduced, how its web UI consumes it) — full
+  detail in the new URL-import note under API Reference → Recipes.
+- Switched URL import to `/create/url/stream` over `XMLHttpRequest`, with progress text on the
+  Add Recipe screen and a fallback to the plain route for pre-v3.13.0 servers.
+- Same Instagram URL imported and parsed correctly on-device (`R5CN20KJXDL`). Worth knowing: the
+  recipe appears in Mealie *before* the app finishes (Mealie saves, then emits `done`), which briefly
+  looked like the earlier failed attempt had created it.
+- `npx tsc --noEmit` clean. No native changes, so no prebuild; `android/app/build.gradle`'s version
+  was bumped in place to match `app.json`. Signature verified with `apksigner`.
+- Released **v1.8.2**/versionCode `34` to GitHub; Ken uploads the AAB to Play Console.
+
+**Session — 2026-08-27**
 
 ### Session 2026-08-27 — in-app image viewer, real save-to-device, v1.8.1 released
 - Ken asked whether attachments/the header image could be viewed without downloading. Investigating

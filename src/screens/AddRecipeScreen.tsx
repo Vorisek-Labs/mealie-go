@@ -17,8 +17,9 @@ type Props = {
 type Mode = 'url' | 'manual' | 'image';
 
 export default function AddRecipeScreen({ navigation }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [mode, setMode] = useState<Mode>('url');
+  const [importProgress, setImportProgress] = useState('');
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,14 +30,19 @@ export default function AddRecipeScreen({ navigation }: Props) {
     const trimmed = url.trim();
     if (!trimmed) { Alert.alert(t('addRecipe.enterUrlAlert')); return; }
     setLoading(true);
+    setImportProgress('');
     try {
-      const slug = await api.createRecipeFromUrl(trimmed);
+      const slug = await api.createRecipeFromUrl(trimmed, {
+        language: i18n.language,
+        onProgress: setImportProgress,
+      });
       // Matches Mealie's own web app: a freshly imported recipe opens
       // straight into the editor for review, not the read-only detail view.
       navigation.replace('RecipeEdit', { slug, name: t('addRecipe.importedRecipeName'), autoParse: parseAfterImport });
     } catch (e) {
       Alert.alert(t('addRecipe.importFailedTitle'), e instanceof Error ? e.message : t('addRecipe.genericUrlImportError'));
       setLoading(false);
+      setImportProgress('');
     }
   };
 
@@ -166,6 +172,9 @@ export default function AddRecipeScreen({ navigation }: Props) {
                 : <Text style={styles.buttonText}>{t('addRecipe.importButton')}</Text>
               }
             </TouchableOpacity>
+            {loading && !!importProgress && (
+              <Text style={styles.progressText}>{importProgress}</Text>
+            )}
           </View>
         )}
 
@@ -258,6 +267,11 @@ function ParseToggle({ value, onChange }: { value: boolean; onChange: (v: boolea
 }
 
 const styles = StyleSheet.create({
+  progressText: {
+    fontSize: typography.size.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,

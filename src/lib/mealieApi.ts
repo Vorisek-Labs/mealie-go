@@ -208,6 +208,78 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // Multipart uploads must NOT set a Content-Type header — fetch derives the
 // multipart/form-data boundary itself from the FormData body.
+// URL import over Mealie's streaming route (v3.13.0+). The plain /create/url
+// route sends nothing back until the whole import is finished, and a video
+// URL (Instagram/TikTok/YouTube) makes the server download the audio,
+// transcribe it and run an LLM over the transcript first — easily longer than
+// the 100s a reverse proxy like Cloudflare waits for a response, which then
+// fails the request with a 524 even though Mealie is still working. The
+// stream route answers immediately and emits Server-Sent Events as it goes
+// (`progress` {message}, then `done` {slug} or `error` {message}); it's what
+// Mealie's own web UI uses.
+//
+// XMLHttpRequest rather than fetch: RN's fetch can't read a response body
+// incrementally, but RN's XHR delivers partial responseText through
+// onprogress. Servers older than v3.13.0 don't have the route (404), so those
+// fall back to the plain one, which also covers the 405 redirect-downgrade
+// retry in request().
+function streamRecipeImport(
+  serverUrl: string,
+  headers: Record<string, string>,
+  body: string,
+  onProgress?: (message: string) => void,
+): Promise<{ slug: string } | { unsupported: true }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    let consumed = 0;
+    let settled = false;
+    const settle = (fn: () => void) => { if (!settled) { settled = true; fn(); } };
+
+    const handleEvent = (block: string) => {
+      let event = 'message';
+      const dataLines: string[] = [];
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
+      }
+      if (dataLines.length === 0) return;
+      let data: { message?: string; slug?: string } = {};
+      try { data = JSON.parse(dataLines.join('\n')); } catch { return; }
+      if (event === 'progress' && data.message) onProgress?.(data.message);
+      else if (event === 'done' && data.slug) settle(() => resolve({ slug: data.slug! }));
+      else if (event === 'error') settle(() => reject(new Error(data.message || 'Recipe import failed')));
+    };
+
+    const drain = () => {
+      if (xhr.status < 200 || xhr.status >= 300) return;
+      const text = xhr.responseText.replace(/\r\n?/g, '\n');
+      let end: number;
+      while ((end = text.indexOf('\n\n', consumed)) !== -1) {
+        handleEvent(text.slice(consumed, end));
+        consumed = end + 2;
+      }
+    };
+
+    xhr.onprogress = drain;
+    xhr.onload = () => {
+      if (xhr.status === 404 || xhr.status === 405) return settle(() => resolve({ unsupported: true }));
+      if (xhr.status === 401) return settle(() => reject(new Error('UNAUTHORIZED')));
+      if (xhr.status < 200 || xhr.status >= 300) {
+        return settle(() => reject(new Error(`${xhr.status}: ${xhr.responseText || 'Request failed'}`)));
+      }
+      drain();
+      // A trailing event without its closing blank line.
+      if (consumed < xhr.responseText.length) handleEvent(xhr.responseText.slice(consumed));
+      settle(() => reject(new Error('The server closed the import stream without a result.')));
+    };
+    xhr.onerror = () => settle(() => reject(new Error('Network request failed')));
+
+    xhr.open('POST', `${serverUrl}/api/recipes/create/url/stream`);
+    for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
+    xhr.send(body);
+  });
+}
+
 async function requestMultipart<T>(path: string, method: string, form: FormData): Promise<T> {
   const [serverUrl, token, proxyHeaders] = await Promise.all([getServerUrl(), getToken(), getProxyHeaders()]);
   const headers = { ...headersToRecord(proxyHeaders), Authorization: `Bearer ${token}` };
@@ -475,11 +547,20 @@ export const api = {
   // variants) -- the old path now gets matched by the /recipes/{slug} route
   // instead (treating "create-url" as a slug), which doesn't support POST,
   // hence a 405 rather than a 404.
-  createRecipeFromUrl: (url: string) =>
-    request<string>('/api/recipes/create/url', {
-      method: 'POST',
-      body: JSON.stringify({ url }),
-    }),
+  createRecipeFromUrl: async (url: string, options?: { language?: string; onProgress?: (message: string) => void }) => {
+    const body = JSON.stringify({ url });
+    const [serverUrl, token, proxyHeaders] = await Promise.all([getServerUrl(), getToken(), getProxyHeaders()]);
+    const result = await streamRecipeImport(serverUrl, {
+      ...headersToRecord(proxyHeaders),
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      Authorization: `Bearer ${token}`,
+      // Mealie translates its progress messages from this.
+      ...(options?.language ? { 'Accept-Language': options.language } : {}),
+    }, body, options?.onProgress);
+    if ('slug' in result) return result.slug;
+    return request<string>('/api/recipes/create/url', { method: 'POST', body });
+  },
 
   createRecipe: (name: string) =>
     request<string>('/api/recipes', {
