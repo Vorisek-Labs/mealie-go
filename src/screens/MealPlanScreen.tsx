@@ -3,11 +3,14 @@ import {
   ActivityIndicator, Alert, FlatList, Modal, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { useMealPlan } from '../hooks/useMealPlan';
 import { api } from '../lib/mealieApi';
+import { localIsoDate } from '../lib/localDate';
 import { navigateToGuide } from '../navigation/navigateToGuide';
+import type { MealPlanStackParams } from '../navigation/RootNavigator';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
 import type { MealPlanEntry, MealPlanEntryType, RecipeSummary } from '../types';
@@ -33,15 +36,13 @@ function mondayOfWeek(date: Date): Date {
   return d;
 }
 
-function isoDate(date: Date): string {
-  return date.toISOString().split('T')[0];
-}
+const isoDate = localIsoDate;
 
 type AddMode = 'recipe' | 'note';
 
 export default function MealPlanScreen() {
   const { t, i18n } = useTranslation();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<MealPlanStackParams>>();
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(0);
 
@@ -57,6 +58,19 @@ export default function MealPlanScreen() {
   const today = new Date();
   const weekStart = addDays(mondayOfWeek(today), weekOffset * 7);
   const { entries, loading, error, refresh, addEntry, removeEntry } = useMealPlan(weekStart);
+
+  // A recipe opened from here can be edited or deleted before Back returns to
+  // this screen, so re-fetch quietly on regaining focus. The first focus is
+  // skipped (the hook already fetches on mount) and `refresh` is read through a
+  // ref so a week change, which gives `refresh` a new identity, doesn't fire
+  // an extra fetch from this effect.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  const hasFocusedOnce = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (!hasFocusedOnce.current) { hasFocusedOnce.current = true; return; }
+    refreshRef.current({ silent: true });
+  }, []));
 
   const selectedDate = isoDate(addDays(weekStart, selectedDay));
   const dayEntries = entries.filter(e => e.date === selectedDate);
@@ -99,6 +113,10 @@ export default function MealPlanScreen() {
     setSearchResults([]);
     setNoteText('');
     setShowAdd(true);
+  };
+
+  const openRecipe = (recipe: RecipeSummary) => {
+    navigation.navigate('RecipeDetail', { slug: recipe.slug, name: recipe.name });
   };
 
   const handleAddRecipe = async (recipe: RecipeSummary) => {
@@ -203,7 +221,7 @@ export default function MealPlanScreen() {
       ) : error ? (
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={refresh}><Text style={styles.retryText}>{t('common.retry')}</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => refresh()}><Text style={styles.retryText}>{t('common.retry')}</Text></TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.planList}>
@@ -221,9 +239,15 @@ export default function MealPlanScreen() {
                 </TouchableOpacity>
               ) : entriesByType[type].map(entry => (
                 <View key={entry.id} style={[styles.mealEntry, entry.recipeId ? null : styles.mealEntryNote]}>
-                  <Text style={styles.mealName}>
-                    {entry.recipe?.name ?? entry.title ?? t('mealPlan.untitled')}
-                  </Text>
+                  {entry.recipe?.slug ? (
+                    <TouchableOpacity style={styles.mealNameTouch} onPress={() => openRecipe(entry.recipe!)}>
+                      <Text style={styles.mealName}>{entry.recipe.name}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.mealName}>
+                      {entry.recipe?.name ?? entry.title ?? t('mealPlan.untitled')}
+                    </Text>
+                  )}
                   {!entry.recipeId && (
                     <Text style={styles.noteTag}>{t('mealPlan.noteTag')}</Text>
                   )}
@@ -369,6 +393,7 @@ const styles = StyleSheet.create({
   emptyMealText: { fontSize: typography.size.sm, color: colors.textDisabled },
   mealEntry: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, gap: spacing.sm },
   mealEntryNote: { borderStyle: 'dashed', borderColor: colors.borderLight },
+  mealNameTouch: { flex: 1 },
   mealName: { flex: 1, fontSize: typography.size.md, color: colors.textPrimary, fontWeight: typography.weight.medium },
   noteTag: { fontSize: typography.size.xs, color: colors.textSecondary, backgroundColor: colors.surfaceElevated, paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm },
   removeText: { color: colors.textDisabled, fontSize: 16 },

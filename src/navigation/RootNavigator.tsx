@@ -42,6 +42,12 @@ export type RecipesStackParams = {
   RecipeSuggestions: undefined;
 };
 
+export type MealPlanStackParams = {
+  MealPlanHome: undefined;
+  RecipeDetail: { slug: string; name: string };
+  RecipeEdit: { slug: string; name: string; autoParse?: boolean };
+};
+
 export type ShoppingStackParams = {
   ShoppingLists: undefined;
   ShoppingListDetail: { listId: string; listName: string };
@@ -63,6 +69,7 @@ export type MainTabParams = {
 const AuthStack = createNativeStackNavigator<AuthStackParams>();
 const RootStack = createNativeStackNavigator<RootStackParams>();
 const RecipesStack = createNativeStackNavigator<RecipesStackParams>();
+const MealPlanStack = createNativeStackNavigator<MealPlanStackParams>();
 const ShoppingStack = createNativeStackNavigator<ShoppingStackParams>();
 const CookbooksStack = createNativeStackNavigator<CookbooksStackParams>();
 const Tab = createBottomTabNavigator<MainTabParams>();
@@ -96,6 +103,19 @@ function RecipesNavigator() {
       <RecipesStack.Screen name="RecipeEdit" component={RecipeEditScreen} />
       <RecipesStack.Screen name="RecipeSuggestions" component={RecipeSuggestionsScreen} />
     </RecipesStack.Navigator>
+  );
+}
+
+// Recipe screens are registered here as well as in RecipesNavigator so that
+// opening a recipe from the meal plan pushes onto this stack and Back returns
+// to the meal plan instead of dropping the user on the Recipes list.
+function MealPlanNavigator() {
+  return (
+    <MealPlanStack.Navigator screenOptions={{ headerShown: false }}>
+      <MealPlanStack.Screen name="MealPlanHome" component={MealPlanScreen} />
+      <MealPlanStack.Screen name="RecipeDetail" component={RecipeDetailScreen as never} />
+      <MealPlanStack.Screen name="RecipeEdit" component={RecipeEditScreen as never} />
+    </MealPlanStack.Navigator>
   );
 }
 
@@ -150,7 +170,7 @@ function MainTabs() {
       })}
     >
       <Tab.Screen name="Recipes" component={RecipesNavigator} />
-      <Tab.Screen name="MealPlan" component={MealPlanScreen} />
+      <Tab.Screen name="MealPlan" component={MealPlanNavigator} />
       <Tab.Screen name="Shopping" component={ShoppingNavigator} />
       <Tab.Screen name="Cookbooks" component={CookbooksNavigator} />
       <Tab.Screen name="Settings" component={SettingsScreen} />

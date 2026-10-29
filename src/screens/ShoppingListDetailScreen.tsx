@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShoppingListDetail } from '../hooks/useShoppingLists';
 import { api } from '../lib/mealieApi';
+import { localIsoDate } from '../lib/localDate';
 import { findPossibleMatchIds } from '../lib/shoppingMatch';
 import EmptyState from '../components/EmptyState';
 import { colors, radius, spacing, typography } from '../theme';
@@ -31,9 +32,7 @@ function addDays(date: Date, days: number): Date {
   d.setDate(d.getDate() + days);
   return d;
 }
-function isoDate(date: Date): string {
-  return date.toISOString().split('T')[0];
-}
+const isoDate = localIsoDate;
 
 type GroupedSection = { label: { id: string; name: string; color?: string } | null; items: ShoppingListItem[] };
 
