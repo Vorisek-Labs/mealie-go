@@ -90,6 +90,7 @@ MealieGo/
     │   └── index.ts               ← all TypeScript interfaces (Recipe, MealPlan, Shopping, etc.)
     ├── lib/
     │   ├── mealieApi.ts           ← Mealie API client: login(), api.*, recipeImageSource()
+    │   ├── localDate.ts           ← localIsoDate(): YYYY-MM-DD in the device's timezone (never toISOString() for meal plan dates)
     │   ├── unitConversion.ts      ← client-side metric⇄original ingredient/temperature conversion
     │   └── onboarding.ts          ← device-level "has seen welcome screen" flag (AsyncStorage)
     ├── context/
@@ -176,7 +177,7 @@ mounts straight into `MainTabs`.
 | Tab | Stack screens |
 |---|---|
 | Recipes 🍽️ | RecipesList → RecipeDetail, AddRecipe (modal), RecipeEdit |
-| Meal Plan 📅 | Single screen (no nested stack) |
+| Meal Plan 📅 | MealPlanHome → RecipeDetail, RecipeEdit |
 | Shopping 🛒 | ShoppingLists → ShoppingListDetail |
 | Cookbooks 📖 | CookbooksList → CookbookDetail |
 | Settings ⚙️ | Single screen |
@@ -212,7 +213,7 @@ Base URL: whatever the user entered on ConnectScreen.
 | POST | `/api/recipes` | Body: `{ name }` → returns slug string |
 | POST | `/api/recipes/create/url` | Body: `{ url }` → returns slug string. **Not** `/create-url` (the old path) — current Mealie versions moved this under `/create/url`, grouped with the streaming (`/create/url/stream`) and bulk (`/create/url/bulk`) variants; the old flat path now gets matched by `/recipes/{slug}` instead (treating "create-url" as a slug), which returns 405 since that route doesn't support POST. **The app no longer calls this directly** — only as a fallback when the stream route below 404s (servers older than v3.13.0). |
 | POST | `/api/recipes/create/url/stream` | Same body, answered as Server-Sent Events: `progress` `{message}` (translated via `Accept-Language`), then `done` `{slug}` or `error` `{message}`. **This is what URL import uses** (v1.8.2+). See below. |
-| PUT | `/api/recipes/{slug}` | Full recipe body |
+| PUT | `/api/recipes/{slug}` | Full recipe body. Returns the saved recipe. **Renaming regenerates the slug**, so the old one 404s afterwards: `RecipeEditScreen` passes the returned slug and name to the `RecipeDetail` below it via `popTo`. |
 | DELETE | `/api/recipes/{slug}` | |
 
 **URL import must use the stream route — a reverse proxy will time out the plain one (HTTP 524).**

@@ -151,7 +151,7 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
     if (!trimmedName) { Alert.alert(t('recipeEdit.nameRequiredAlert')); return; }
     setSaving(true);
     try {
-      await api.updateRecipe(slug, {
+      const saved = await api.updateRecipe(slug, {
         ...recipe,
         name: trimmedName,
         description: description.trim() || undefined,
@@ -174,7 +174,16 @@ export default function RecipeEditScreen({ navigation, route }: Props) {
           .filter(n => n.title.trim() || n.text.trim())
           .map(n => ({ title: n.title.trim(), text: n.text.trim() })),
       });
-      navigation.goBack();
+      // Mealie regenerates the slug when the name changes, so the
+      // RecipeDetail screen underneath still holds the old, now-404 slug.
+      // Hand it the new slug and name while popping back. Edit can also be reached
+      // from the add-recipe flow, where no Detail is on the stack.
+      const detailBelow = navigation.getState().routes.some(r => r.name === 'RecipeDetail');
+      if (detailBelow && saved?.slug) {
+        navigation.popTo('RecipeDetail', { slug: saved.slug, name: saved.name });
+      } else {
+        navigation.goBack();
+      }
     } catch (e) {
       Alert.alert(t('recipeEdit.saveFailedTitle'), e instanceof Error ? e.message : t('recipeEdit.genericSaveError'));
     } finally {
